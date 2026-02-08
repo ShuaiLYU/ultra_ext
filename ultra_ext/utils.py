@@ -93,3 +93,26 @@ def keep_best_detection_per_class(result) -> object:
         filtered_result.masks = result.masks[selected_indices]
     
     return filtered_result
+
+
+
+def save_res_and_open_in_vscode(res, save_path: str="./runs/temp/res.jpg"):
+	"""
+	Save the image to the specified path and open it in VSCode.
+	
+	Args:
+		res: Result object to save
+		save_path: Path to save the image
+	"""
+	import os
+	import subprocess
+
+	os.makedirs(os.path.dirname(save_path), exist_ok=True)
+	res.save(save_path)
+	print(f"Saved visualization to {save_path}")
+
+	# Open in VSCode
+	try:
+		subprocess.run(["code", save_path], check=True)
+	except Exception as e:
+		print(f"Failed to open in VSCode: {e}")

@@ -3,6 +3,20 @@ import numpy as np
 
 class TestSample:
 	visual_prompts = [
+          
+		{
+			"image": "ultralytics/assets/bus.jpg",
+			"prompts": dict(
+				bboxes=np.array([
+					[221.52, 405.8, 344.98, 857.54],  # Box enclosing person
+					[120, 425, 160, 445],              # Box enclosing glasses
+				]),
+				cls=np.array([
+					0,  # ID to be assigned for person
+					1,  # ID to be assigned for glasses
+				]),
+			),
+		},
 		{
 			"image": "../datasets/coco/images/val2017/000000002157.jpg",
 			"prompts": {
@@ -71,6 +85,49 @@ class TestSample:
 		return cls.text_prompts[index]
 
 
+def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
+
+
+
+
+    source=kwargs.get("source","ultralytics/assets/bus.jpg")
+    model = YOLO(model_weight)
+    names= kwargs.get("names",["bus","man"])
+    model.set_classes(names, model.get_text_pe(names))
+
+    res=model.predict(source=source,**kwargs)[0]
+
+
+    save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    res.save(save_path)
+
+    return save_path
+
+
+def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt",**kwargs):
+
+    from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
+
+    source=kwargs.get("source",TestSample.get_visual_prompt(0)["image"])
+    visual_prompts=kwargs.get("visual_prompts",TestSample.get_visual_prompt(0)["prompts"])
+
+    model = YOLO(model_weight)
+
+    res = model.predict(
+        source=source,
+        visual_prompts=visual_prompts,
+        conf=0.1,
+        # predictor=YOLOEVPDetectPredictor,
+        predictor=YOLOEVPSegPredictor,
+    )[0]
+
+
+    save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    res.save(save_path)
+
+    return save_path
 
 import torch
 from ultralytics import YOLOE,YOLO
@@ -109,21 +166,3 @@ def print_model_head_cv4(model_weight):
         print(f"bias: {m.bias}")
 
 
-def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
-
-    from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
-
-
-    source=kwargs.get("source","ultralytics/assets/bus.jpg")
-    model = YOLO(model_weight)
-    names= kwargs.get("names",["bus","man"])
-    model.set_classes(names, model.get_text_pe(names))
-
-    res=model.predict(source=source,**kwargs)[0]
-
-
-    save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    res.save(save_path)
-
-    return save_path

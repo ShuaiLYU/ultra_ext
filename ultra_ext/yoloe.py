@@ -3,8 +3,8 @@
 
 
 import torch
-from ultralytics import YOLOE
-
+from ultralytics import YOLOE,YOLO
+import os
 
 def print_model_head_cv3(model_weight):
 
@@ -37,3 +37,20 @@ def print_model_head_cv4(model_weight):
 
         print(f"logit_scale: {m.logit_scale.item()}")
         print(f"bias: {m.bias}")
+
+
+def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
+
+    from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
+
+
+    source=kwargs.get("source","ultralytics/assets/bus.jpg")
+    model = YOLO(model_weight)
+    res=model.predict(source=source,**kwargs)[0]
+
+
+    save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    res.save(save_path)
+
+    return save_path

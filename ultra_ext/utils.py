@@ -6,7 +6,10 @@ import os
 import torch
 from copy import deepcopy
 from typing import Dict
-
+import cv2
+import numpy as np
+from pathlib import Path
+import math
 
 def split_detections_by_class(result) -> Dict[int, object]:
     """
@@ -119,13 +122,16 @@ def save_res(res, save_path: str="./runs/temp/res.jpg",vscode_open: bool=False):
     """
     import os
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    if isinstance(res, np.ndarray):
+        res=Image.fromarray(res)
+
     res.save(save_path)
     print(f"Saved visualization to {save_path}")
     if vscode_open:
         open_in_vscode(save_path)
           
 def save_results_grid(results, save_path: str="./runs/temp/results_grid.jpg", cols: int = None,vscode_open: bool=False):
-    """
+    """d
     Save multiple result images as a grid layout to a single image file.
     
     Args:
@@ -136,10 +142,7 @@ def save_results_grid(results, save_path: str="./runs/temp/results_grid.jpg", co
     Returns:
         str: Path where the image was saved
     """
-    import cv2
-    import numpy as np
-    from pathlib import Path
-    import math
+
     
     if not results:
         print("No results to save")
@@ -186,3 +189,56 @@ def save_results_grid(results, save_path: str="./runs/temp/results_grid.jpg", co
     if vscode_open:
         open_in_vscode(str(save_path))
     return str(save_path)
+
+
+# a function read all shapes from labelme json file
+
+def read_labelme_shapes(labelme_json_path: str):
+    """
+    Read shapes from a LabelMe JSON file. And set 
+    
+    Args:
+        labelme_json_path: Path to the LabelMe JSON file. 
+    Returns:
+        List of shape dictionaries from the JSON file
+    """
+
+    import json
+    import numpy as np
+    with open(labelme_json_path, 'r') as f:
+        data = json.load(f)
+    shapes=data.get("shapes", [])
+
+    def points2bbox(points):
+        points = np.array(points)
+        min_x = int(np.min(points[:, 0]))
+        max_x = int(np.max(points[:, 0]))
+        min_y = int(np.min(points[:, 1]))
+        max_y = int(np.max(points[:, 1]))
+        return [min_x, min_y, max_x, max_y]
+    
+    for shape in shapes:
+        shape["bbox"] = points2bbox(shape["points"])
+    return shapes
+
+import cv2
+def draw_bboxes_labels_on_img(img, bboxes, labels):
+    """
+    Display bounding boxes and labels on the image.
+    
+    Args:
+        image_path (str): Path to the image file.
+        bboxes (list): List of bounding boxes in the format [x1, y1, x2, y2].
+        labels (list): List of labels corresponding to the bounding boxes.
+    """
+    for bbox, label in zip(bboxes, labels):
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(img, str(label), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    return img
+
+
+from PIL import Image
+import numpy as np
+def read_im_rgb(img_path):
+    return np.array(Image.open(img_path).convert("RGB"))

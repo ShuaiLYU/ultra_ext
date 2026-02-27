@@ -243,3 +243,357 @@ from PIL import Image
 import numpy as np
 def read_im_rgb(img_path):
     return np.array(Image.open(img_path).convert("RGB"))
+
+
+
+import torch
+import os
+
+
+def compare_weights(pt1, pt2):
+    """
+    Compare two PyTorch weight files and analyze their differences.
+    
+    Args:
+        pt1: Path to the first PyTorch weight file
+        pt2: Path to the second PyTorch weight file
+    """
+    file1 = pt1
+    file2 = pt2
+    
+    # strip_optimizer(file1)
+    # strip_optimizer(file2)
+
+
+    print("=== File Sizes ===")
+
+    from ultralytics.utils.torch_utils import strip_optimizer
+    strip_optimizer(file2) # remove ema weight to avoid conflict
+
+
+    from pathlib import Path
+    from ultralytics.utils.torch_utils import strip_optimizer
+
+    # strip_optimizer(file1)
+    # strip_optimizer(file2)
+
+
+    print("=== File Sizes ===")
+    if os.path.exists(file1):
+        size1 = os.path.getsize(file1) / (1024**2)  # MB
+        print(f"Model 1 ({file1}): {size1:.2f} MB")
+    if os.path.exists(file2):
+        size2 = os.path.getsize(file2) / (1024**2)  # MB
+        print(f"Model 2 ({file2}): {size2:.2f} MB")
+
+    # 加载两个模型文件
+    model1 = torch.load(file1, weights_only=False)
+    model2 = torch.load(file2, weights_only=False)
+
+    # 1. Check keys contained in files (determine if training state exists)
+    print("=== Model 1 Contents ===")
+    for k in model1.keys():
+        print(k)
+
+    print("\n=== Model 2 Contents ===")
+    for k in model2.keys():
+        print(k)
+
+
+    assert "model" in model1, f"Model 1 ({file1}) missing 'model' key, please check file contents"
+    assert model1["model"] is not None, f"Model 1 ({file1}) 'model' is None, please check file contents"
+    assert "model" in model2, f"Model 2 ({file2}) missing 'model' key, please check file contents"
+    assert model2["model"] is not None, f"Model 2 ({file2}) 'model' is None, please check file contents"
+
+    # 2. Check model parameter count (determine if structure differs)
+    if "model" in model1 and "model" in model2 and model1["model"] is not None and model2["model"] is not None:
+        params1 = sum(p.numel() for p in model1["model"].parameters())
+        params2 = sum(p.numel() for p in model2["model"].parameters())
+        print(f"\nModel 1 parameter count: {params1 / 1e6:.2f} M")
+        print(f"Model 2 parameter count: {params2 / 1e6:.2f} M")
+    else:
+        print("\n⚠️ Cannot calculate parameter count:")
+        if "model" not in model1:
+            print(f"  - Model 1 ({file1}) missing 'model' key")
+        elif model1["model"] is None:
+            print(f"  - Model 1 ({file1}) 'model' is None")
+        if "model" not in model2:
+            print(f"  - Model 2 ({file2}) missing 'model' key")
+        elif model2["model"] is None:
+            print(f"  - Model 2 ({file2}) 'model' is None")
+
+    # 3. Check model parameter data types (float32 or float16)
+    print("\n=== Model 1 Parameter Data Types ===")
+    if "model" in model1 and model1["model"] is not None:
+        dtypes1 = set(p.dtype for p in model1["model"].parameters())
+        for dtype in dtypes1:
+            print(f"Data type: {dtype}")
+    else:
+        if "model" not in model1:
+            print(f"⚠️ Model 1 ({file1}) missing 'model' key")
+        elif model1["model"] is None:
+            print(f"⚠️ Model 1 ({file1}) 'model' is None")
+
+    print("\n=== Model 2 Parameter Data Types ===")
+    if "model" in model2 and model2["model"] is not None:
+        dtypes2 = set(p.dtype for p in model2["model"].parameters())
+        for dtype in dtypes2:
+            print(f"Data type: {dtype}")
+    else:
+        if "model" not in model2:
+            print(f"⚠️ Model 2 ({file2}) missing 'model' key")
+        elif model2["model"] is None:
+            print(f"⚠️ Model 2 ({file2}) 'model' is None")
+
+    # 4. Check component sizes (find reason for file size difference)
+    print("\n=== Model 1 Component Sizes ===")
+    for key in model1.keys():
+        if key == "model" or key == "ema":
+            if model1[key] is not None:
+                params = sum(p.numel() * p.element_size() for p in model1[key].parameters())
+                print(f"{key}: {params / (1024**2):.2f} MB")
+        elif key == "optimizer":
+            if model1[key] is not None:
+                # 计算optimizer state的大小
+                opt_size = 0
+                if "state" in model1[key]:
+                    for state in model1[key]["state"].values():
+                        for v in state.values():
+                            if torch.is_tensor(v):
+                                opt_size += v.numel() * v.element_size()
+                print(f"{key}: {opt_size / (1024**2):.2f} MB")
+        else:
+            # 其他小对象
+            pass
+
+    print("\n=== Model 2 Component Sizes ===")
+    for key in model2.keys():
+        if key == "model" or key == "ema":
+            if model2[key] is not None:
+                params = sum(p.numel() * p.element_size() for p in model2[key].parameters())
+                print(f"{key}: {params / (1024**2):.2f} MB")
+        elif key == "optimizer":
+            if model2[key] is not None:
+                # 计算optimizer state的大小
+                opt_size = 0
+                if "state" in model2[key]:
+                    for state in model2[key]["state"].values():
+                        for v in state.values():
+                            if torch.is_tensor(v):
+                                opt_size += v.numel() * v.element_size()
+                print(f"{key}: {opt_size / (1024**2):.2f} MB")
+        else:
+            # 其他小对象
+            pass
+
+    # 5. Detailed comparison of model parameters and buffers (find reason for size difference)
+    print("\n=== Detailed Model Size Difference Analysis ===")
+
+    # Check parameters
+    if "model" in model1 and "model" in model2 and model1["model"] is not None and model2["model"] is not None:
+        # Parameter sizes
+        params_size1 = sum(p.numel() * p.element_size() for p in model1["model"].parameters())
+        params_size2 = sum(p.numel() * p.element_size() for p in model2["model"].parameters())
+        
+        # Buffer sizes (buffers are not parameters but also take space)
+        buffers_size1 = sum(b.numel() * b.element_size() for b in model1["model"].buffers())
+        buffers_size2 = sum(b.numel() * b.element_size() for b in model2["model"].buffers())
+        
+        print(f"Model 1 - Parameters: {params_size1 / (1024**2):.2f} MB, Buffers: {buffers_size1 / (1024**2):.2f} MB")
+        print(f"Model 2 - Parameters: {params_size2 / (1024**2):.2f} MB, Buffers: {buffers_size2 / (1024**2):.2f} MB")
+        
+        # Check total size of all tensors in state_dict
+        state_dict1 = model1["model"].state_dict()
+        state_dict2 = model2["model"].state_dict()
+        
+        total_size1 = sum(v.numel() * v.element_size() for v in state_dict1.values() if torch.is_tensor(v))
+        total_size2 = sum(v.numel() * v.element_size() for v in state_dict2.values() if torch.is_tensor(v))
+        
+        print(f"\nstate_dict total size - Model 1: {total_size1 / (1024**2):.2f} MB, Model 2: {total_size2 / (1024**2):.2f} MB")
+        
+        # Check if there are different keys
+        keys1 = set(state_dict1.keys())
+        keys2 = set(state_dict2.keys())
+        
+        if keys1 != keys2:
+            print("\nDifferent keys found:")
+            only_in_1 = keys1 - keys2
+            only_in_2 = keys2 - keys1
+            if only_in_1:
+                print(f"Only in Model 1: {only_in_1}")
+            if only_in_2:
+                print(f"Only in Model 2: {only_in_2}")
+        
+        # Compare tensor sizes for common keys
+        print("\nChecking shape differences for common keys:")
+        diff_found = False
+        for key in keys1 & keys2:
+            if torch.is_tensor(state_dict1[key]) and torch.is_tensor(state_dict2[key]):
+                if state_dict1[key].shape != state_dict2[key].shape:
+                    print(f"  {key}: Model 1={state_dict1[key].shape}, Model 2={state_dict2[key].shape}")
+                    diff_found = True
+                elif state_dict1[key].dtype != state_dict2[key].dtype:
+                    print(f"  {key}: Model 1 dtype={state_dict1[key].dtype}, Model 2 dtype={state_dict2[key].dtype}")
+                    diff_found = True
+        
+        if not diff_found:
+            print("  All common keys have consistent shapes and data types")
+        
+        # 6. Analyze which layers were trained/updated (weights changed)
+        print("\n=== Analyzing Trained Layers (Weight Difference Analysis) ===")
+        
+        common_keys = keys1 & keys2
+        trained_layers = []
+        unchanged_layers = []
+        
+        for key in sorted(common_keys):
+            if torch.is_tensor(state_dict1[key]) and torch.is_tensor(state_dict2[key]):
+                # Ensure shapes match
+                if state_dict1[key].shape != state_dict2[key].shape:
+                    continue
+                
+                # Skip non-floating-point tensors (like indices, integers)
+                if not state_dict1[key].dtype.is_floating_point:
+                    continue
+                
+                # Calculate weight differences
+                diff = (state_dict1[key].float() - state_dict2[key].float()).abs()
+                max_diff = diff.max().item()
+                mean_diff = diff.mean().item()
+                
+                # Calculate relative difference (normalized)
+                weight_scale = state_dict1[key].abs().mean().item() + 1e-8
+                relative_diff = mean_diff / weight_scale
+                
+                # Determine if layer was trained (threshold is adjustable)
+                if max_diff > 1e-6 or mean_diff > 1e-7:
+                    trained_layers.append({
+                        'name': key,
+                        'max_diff': max_diff,
+                        'mean_diff': mean_diff,
+                        'relative_diff': relative_diff,
+                        'shape': state_dict1[key].shape
+                    })
+                else:
+                    unchanged_layers.append(key)
+        
+        # Sort by difference from largest to smallest
+        trained_layers.sort(key=lambda x: x['mean_diff'], reverse=True)
+        
+        print(f"\nNumber of trained layers: {len(trained_layers)} / {len(common_keys)}")
+        print(f"Number of unchanged layers: {len(unchanged_layers)}")
+        
+        if trained_layers:
+            print("\nTrained layers (sorted by average difference):")
+            print(f"{'Layer Name':<80} {'Shape':<25} {'Max Diff':<15} {'Mean Diff':<15} {'Relative Diff':<10}")
+            print("=" * 150)
+            
+            for i, layer in enumerate(trained_layers[:50]):  # Show only first 50
+                print(f"{layer['name']:<80} {str(layer['shape']):<25} "
+                    f"{layer['max_diff']:<15.6e} {layer['mean_diff']:<15.6e} {layer['relative_diff']:<10.6f}")
+            
+            if len(trained_layers) > 50:
+                print(f"\n... and {len(trained_layers) - 50} more trained layers")
+            
+            # Group statistics by layer type
+            print("\nStatistics by layer type:")
+            layer_groups = {}
+            for layer in trained_layers:
+                # Extract layer type (e.g. model.22.cv4.0.conv.weight -> cv4)
+                parts = layer['name'].split('.')
+                if len(parts) >= 3:
+                    layer_type = parts[2]  # Usually cv2, cv3, cv4, savpe, etc.
+                else:
+                    layer_type = 'other'
+                
+                if layer_type not in layer_groups:
+                    layer_groups[layer_type] = []
+                layer_groups[layer_type].append(layer)
+            
+            for layer_type, layers in sorted(layer_groups.items()):
+                avg_diff = sum(l['mean_diff'] for l in layers) / len(layers)
+                print(f"  {layer_type}: {len(layers)} layers, average difference: {avg_diff:.6e}")
+        
+        if unchanged_layers and len(unchanged_layers) <= 20:
+            print(f"\nUnchanged layers:")
+            for key in unchanged_layers:
+                print(f"  {key}")
+        elif unchanged_layers:
+            print(f"\nSample of unchanged layers (total {len(unchanged_layers)} layers):")
+            for key in unchanged_layers[:10]:
+                print(f"  {key}")
+            print(f"  ... and {len(unchanged_layers) - 10} more unchanged layers")
+
+        # 7. Specifically check cv4 bias and logit_scale parameters
+        print("\n=== CV4 Layer bias and logit_scale Comparison ===")
+        
+        # Dynamically find detection head indices (usually the last layer)
+        head_indices = set()
+        for key in state_dict1.keys():
+            if "cv4" in key or "one2one_cv4" in key:
+                parts = key.split('.')
+                if len(parts) >= 2 and parts[0] == "model":
+                    head_indices.add(int(parts[1]))
+        
+        if not head_indices:
+            print("No cv4 layers found")
+        else:
+            print(f"Detected head indices: {sorted(head_indices)}")
+        
+        cv4_params = {}
+        for model_name, state_dict in [("Model 1 (before)", state_dict1), ("Model 2 (after)", state_dict2)]:
+            print(f"\n{model_name}:")
+            
+            # 遍历所有检测头索引
+            for head_idx in sorted(head_indices):
+                # 检查 cv4 和 one2one_cv4
+                for cv4_name in ["cv4", "one2one_cv4"]:
+                    for i in range(3):  # 0, 1, 2
+                        bias_key = f"model.{head_idx}.{cv4_name}.{i}.bias"
+                        logit_scale_key = f"model.{head_idx}.{cv4_name}.{i}.logit_scale"
+                        
+                        # 打印 bias
+                        if bias_key in state_dict:
+                            bias_value = state_dict[bias_key]
+                            print(f"  {cv4_name}[{i}].bias: {bias_value.item():.6f}")
+                            if model_name not in cv4_params:
+                                cv4_params[model_name] = {}
+                            cv4_params[model_name][bias_key] = bias_value.item()
+                        
+                        # 打印 logit_scale
+                        if logit_scale_key in state_dict:
+                            logit_scale_value = state_dict[logit_scale_key]
+                            print(f"  {cv4_name}[{i}].logit_scale: {logit_scale_value.item():.6f}")
+                            if model_name not in cv4_params:
+                                cv4_params[model_name] = {}
+                            cv4_params[model_name][logit_scale_key] = logit_scale_value.item()
+        
+        # Calculate changes
+        if len(cv4_params) == 2:
+            print("\nChange Analysis:")
+            model1_name = "Model 1 (before)"
+            model2_name = "Model 2 (after)"
+            
+            all_keys = set(cv4_params[model1_name].keys()) | set(cv4_params[model2_name].keys())
+            
+            for key in sorted(all_keys):
+                if key in cv4_params[model1_name] and key in cv4_params[model2_name]:
+                    val1 = cv4_params[model1_name][key]
+                    val2 = cv4_params[model2_name][key]
+                    diff = val2 - val1
+                    rel_change = (diff / abs(val1)) * 100 if val1 != 0 else float('inf')
+                    
+                    param_name = key.split('.')[-1]  # bias or logit_scale
+                    layer_name = '.'.join(key.split('.')[-3:-1])  # cv4.0, cv4.1, etc.
+                    
+                    if abs(diff) > 1e-6:
+                        print(f"  {layer_name}.{param_name}:")
+                        print(f"    Before: {val1:.6f} → After: {val2:.6f}")
+                        # print(f"    Change: {diff:+.6f} ({rel_change:+.2f}%)")
+                    else:
+                        print(f"  {layer_name}.{param_name}: unchanged ({val1:.6f})")
+
+    else:
+        print("Cannot compare model parameters, possibly missing 'model' key or model is None")    
+        
+    print("\n=== Analysis Complete ===")

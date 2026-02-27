@@ -87,16 +87,15 @@ class TestSample:
 
 def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 
-
-
-
-    source=kwargs.get("source","ultralytics/assets/bus.jpg")
+    kwargs["source"]=kwargs.get("source","ultralytics/assets/bus.jpg")
     model = YOLO(model_weight)
-    names= kwargs.get("names",["bus","man"])
-    model.set_classes(names, model.get_text_pe(names))
 
-    res=model.predict(source=source,**kwargs)[0]
+    kwargs["names"]= kwargs.get("names",["bus","man"])
+    model.set_classes(kwargs["names"], model.get_text_pe(kwargs["names"]))
+    del kwargs["names"]
 
+    print(f"kwargs: {kwargs}")
+    res=model.predict(**kwargs)[0]
 
     save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -107,21 +106,15 @@ def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 
 def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt",**kwargs):
 
-    from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
-
-    source=kwargs.get("source",TestSample.get_visual_prompt(0)["image"])
-    visual_prompts=kwargs.get("visual_prompts",TestSample.get_visual_prompt(0)["prompts"])
-
     model = YOLO(model_weight)
 
-    res = model.predict(
-        source=source,
-        visual_prompts=visual_prompts,
-        conf=0.1,
-        # predictor=YOLOEVPDetectPredictor,
-        predictor=YOLOEVPSegPredictor,
-    )[0]
+    from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
 
+    kwargs["source"]=kwargs.get("source",TestSample.get_visual_prompt(0)["image"])
+    kwargs["visual_prompts"]=kwargs.get("visual_prompts",TestSample.get_visual_prompt(0)["prompts"])
+
+    res = model.predict(
+        predictor=YOLOEVPSegPredictor,**kwargs)[0]
 
     save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)

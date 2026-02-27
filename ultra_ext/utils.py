@@ -231,6 +231,7 @@ def draw_bboxes_labels_on_img(img, bboxes, labels):
         bboxes (list): List of bounding boxes in the format [x1, y1, x2, y2].
         labels (list): List of labels corresponding to the bounding boxes.
     """
+    img=img.copy()
     for bbox, label in zip(bboxes, labels):
         x1, y1, x2, y2 = bbox
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)

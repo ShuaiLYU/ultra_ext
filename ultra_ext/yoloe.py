@@ -110,8 +110,8 @@ def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		if clip_weight_name:
 			model.args["clip_weight_name"] = clip_weight_name
 
-		kwargs["names"] = kwargs.pop("names", ["bus", "man"])
-		model.set_classes(kwargs["names"], model.get_text_pe(kwargs["names"]))
+		names = kwargs.pop("names", ["bus", "man"])
+		model.set_classes(names, model.get_text_pe(names))
 
 		print(f"kwargs: {kwargs}")
 		res = model.predict(**kwargs)[0]

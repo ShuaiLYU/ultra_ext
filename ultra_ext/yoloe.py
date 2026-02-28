@@ -3,13 +3,13 @@ import numpy as np
 
 class TestSample:
 	visual_prompts = [
-          
+		  
 		{
 			"image": "ultralytics/assets/bus.jpg",
 			"prompts": dict(
 				bboxes=np.array([
 					[221.52, 405.8, 344.98, 857.54],  # Box enclosing person
-					[120, 425, 160, 445],              # Box enclosing glasses
+					[120, 425, 160, 445],			  # Box enclosing glasses
 				]),
 				cls=np.array([
 					0,  # ID to be assigned for person
@@ -88,52 +88,83 @@ class TestSample:
 from ultralytics import YOLO,YOLOE
 
 def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
-
-	kwargs["source"]=kwargs.get("source","ultralytics/assets/bus.jpg")
+	"""Text Prompt prediction for YOLOE.
 	
-	if isinstance(model_weight, str) and model_weight.endswith('.pt'):
+	Args:
+		model_weight: Path to model weights
+		**kwargs: Additional arguments for prediction
+			- source: Image path (default: ultralytics/assets/bus.jpg)
+			- names: Class names (default: ["bus", "man"])
+			- clip_weight_name: CLIP model name
+			- save_path: Path to save result image
+	
+	Returns:
+		str: Path to saved result image
+	"""
+	try:
+		kwargs["source"] = kwargs.get("source", "ultralytics/assets/bus.jpg")
+		
 		model = YOLO(model_weight)
-	elif isinstance(model_weight,YOLOE) or isinstance(model_weight,YOLO):
-		model=model_weight
-	else:
-		raise ValueError("model_weight should be either a path to a .pt file or an instance of YOLOE/YOLO model.")
+		
+		clip_weight_name = kwargs.pop("clip_weight_name", None)
+		if clip_weight_name:
+			model.args["clip_weight_name"] = clip_weight_name
 
-	kwargs["names"]= kwargs.get("names",["bus","man"])
-	model.set_classes(kwargs["names"], model.get_text_pe(kwargs["names"]))
-	del kwargs["names"]
+		kwargs["names"] = kwargs.pop("names", ["bus", "man"])
+		model.set_classes(kwargs["names"], model.get_text_pe(kwargs["names"]))
 
-	print(f"kwargs: {kwargs}")
-	res=model.predict(**kwargs)[0]
+		print(f"kwargs: {kwargs}")
+		res = model.predict(**kwargs)[0]
 
-	save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
-	os.makedirs(os.path.dirname(save_path), exist_ok=True)
-	res.save(save_path)
+		save_path = kwargs.get("save_path", f"./runs/temp/tp_{model_weight.replace('.pt', '')}_pred.png")
+		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+		res.save(save_path)
 
-	return save_path
+		return save_path
+	except Exception as e:
+		print(f"❌ Error in predict_yoloe_tp: {e}")
+		raise
 
 
-def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt",**kwargs):
-
-	if isinstance(model_weight, str) and model_weight.endswith('.pt'):
+def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
+	"""Visual Prompt prediction for YOLOE.
+	
+	Args:
+		model_weight: Path to model weights
+		**kwargs: Additional arguments for prediction
+			- source: Image path
+			- visual_prompts: Visual prompt bboxes and classes
+			- predictor: Custom predictor class
+			- save_path: Path to save result image
+	
+	Returns:
+		str: Path to saved result image
+	"""
+	try:
 		model = YOLO(model_weight)
-	elif isinstance(model_weight,YOLOE) or isinstance(model_weight,YOLO):
-		model=model_weight
-	else:
-		raise ValueError("model_weight should be either a path to a .pt file or an instance of YOLOE/YOLO model.")
 
-	from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
+		clip_weight_name = kwargs.pop("clip_weight_name", None)
+		if clip_weight_name:
+			model.args["clip_weight_name"] = clip_weight_name
 
-	kwargs["source"]=kwargs.get("source",TestSample.get_visual_prompt(0)["image"])
-	kwargs["visual_prompts"]=kwargs.get("visual_prompts",TestSample.get_visual_prompt(0)["prompts"])
+		from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
 
-	res = model.predict(
-		predictor=YOLOEVPSegPredictor,**kwargs)[0]
+		kwargs["source"] = kwargs.get("source", TestSample.get_visual_prompt(0)["image"])
+		kwargs["visual_prompts"] = kwargs.get("visual_prompts", TestSample.get_visual_prompt(0)["prompts"])
+		kwargs["predictor"] = kwargs.get("predictor", YOLOEVPSegPredictor)
 
-	save_path=kwargs.get("save_path",f"./runs/temp/tp_{model_weight.replace('.pt','')}_pred.png")
-	os.makedirs(os.path.dirname(save_path), exist_ok=True)
-	res.save(save_path)
+		res = model.predict(**kwargs)[0]
 
-	return save_path
+		# ✅ 改为 vp，避免与 tp 冲突
+		save_path = kwargs.get("save_path", f"./runs/temp/vp_{model_weight.replace('.pt', '')}_pred.png")
+		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+		res.save(save_path)
+
+		return save_path
+	except Exception as e:
+		print(f"❌ Error in predict_yoloe_vp: {e}")
+		raise
+
 
 import torch
 from ultralytics import YOLOE,YOLO

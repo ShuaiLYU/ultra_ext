@@ -597,3 +597,343 @@ def compare_weights(pt1, pt2):
         print("Cannot compare model parameters, possibly missing 'model' key or model is None")    
         
     print("\n=== Analysis Complete ===")
+
+
+
+import numpy as np
+from pathlib import Path
+
+
+def _compare_values_recursive(val1, val2, path="root", max_depth=20, current_depth=0):
+    """Recursively compare two values, handling nested structures.
+    
+    Args:
+        val1: First value to compare
+        val2: Second value to compare
+        path: Current path in the data structure (for error reporting)
+        max_depth: Maximum recursion depth to prevent infinite loops
+        current_depth: Current recursion depth
+        
+    Returns:
+        tuple: (is_equal: bool, difference_info: dict or None)
+    """
+    if current_depth > max_depth:
+        return False, {
+            'type': 'max_depth_exceeded',
+            'path': path,
+            'message': f'Maximum recursion depth {max_depth} exceeded'
+        }
+    
+    # Check if types match
+    if type(val1) != type(val2):
+        return False, {
+            'type': 'type_mismatch',
+            'path': path,
+            'type1': type(val1).__name__,
+            'type2': type(val2).__name__
+        }
+    
+    # Handle None
+    if val1 is None and val2 is None:
+        return True, None
+    
+    # Handle numpy arrays
+    if isinstance(val1, np.ndarray):
+        try:
+            if val1.shape != val2.shape:
+                return False, {
+                    'type': 'numpy_array_shape_mismatch',
+                    'path': path,
+                    'shape1': val1.shape,
+                    'shape2': val2.shape,
+                    'dtype1': str(val1.dtype),
+                    'dtype2': str(val2.dtype)
+                }
+            
+            arrays_equal = np.array_equal(val1, val2)
+            if not arrays_equal:
+                return False, {
+                    'type': 'numpy_array_content_mismatch',
+                    'path': path,
+                    'shape': val1.shape,
+                    'dtype': str(val1.dtype),
+                    'max_diff': float(np.max(np.abs(val1 - val2))) if np.issubdtype(val1.dtype, np.number) else 'N/A'
+                }
+            return True, None
+        except Exception as e:
+            return False, {
+                'type': 'numpy_comparison_error',
+                'path': path,
+                'error': str(e)
+            }
+    
+    # Handle torch tensors
+    try:
+        import torch
+        if isinstance(val1, torch.Tensor):
+            try:
+                if val1.shape != val2.shape:
+                    return False, {
+                        'type': 'torch_tensor_shape_mismatch',
+                        'path': path,
+                        'shape1': tuple(val1.shape),
+                        'shape2': tuple(val2.shape),
+                        'dtype1': str(val1.dtype),
+                        'dtype2': str(val2.dtype)
+                    }
+                
+                tensors_equal = torch.equal(val1, val2)
+                if not tensors_equal:
+                    return False, {
+                        'type': 'torch_tensor_content_mismatch',
+                        'path': path,
+                        'shape': tuple(val1.shape),
+                        'dtype': str(val1.dtype),
+                        'max_diff': float(torch.max(torch.abs(val1 - val2))) if val1.dtype in [torch.float32, torch.float64, torch.float16] else 'N/A'
+                    }
+                return True, None
+            except Exception as e:
+                return False, {
+                    'type': 'torch_comparison_error',
+                    'path': path,
+                    'error': str(e)
+                }
+    except ImportError:
+        pass  # torch not available
+    
+    # Handle dictionaries - recursively compare
+    if isinstance(val1, dict):
+        keys1 = set(val1.keys())
+        keys2 = set(val2.keys())
+        
+        if keys1 != keys2:
+            return False, {
+                'type': 'dict_keys_mismatch',
+                'path': path,
+                'keys_only_in_1': keys1 - keys2,
+                'keys_only_in_2': keys2 - keys1
+            }
+        
+        # Recursively compare all values
+        for key in keys1:
+            is_equal, diff_info = _compare_values_recursive(
+                val1[key], val2[key], 
+                path=f"{path}.{key}",
+                max_depth=max_depth,
+                current_depth=current_depth + 1
+            )
+            if not is_equal:
+                return False, diff_info
+        
+        return True, None
+    
+    # Handle lists - recursively compare elements
+    if isinstance(val1, list):
+        if len(val1) != len(val2):
+            return False, {
+                'type': 'list_length_mismatch',
+                'path': path,
+                'length1': len(val1),
+                'length2': len(val2)
+            }
+        
+        for i, (item1, item2) in enumerate(zip(val1, val2)):
+            is_equal, diff_info = _compare_values_recursive(
+                item1, item2,
+                path=f"{path}[{i}]",
+                max_depth=max_depth,
+                current_depth=current_depth + 1
+            )
+            if not is_equal:
+                return False, diff_info
+        
+        return True, None
+    
+    # Handle tuples - recursively compare elements
+    if isinstance(val1, tuple):
+        if len(val1) != len(val2):
+            return False, {
+                'type': 'tuple_length_mismatch',
+                'path': path,
+                'length1': len(val1),
+                'length2': len(val2)
+            }
+        
+        for i, (item1, item2) in enumerate(zip(val1, val2)):
+            is_equal, diff_info = _compare_values_recursive(
+                item1, item2,
+                path=f"{path}[{i}]",
+                max_depth=max_depth,
+                current_depth=current_depth + 1
+            )
+            if not is_equal:
+                return False, diff_info
+        
+        return True, None
+    
+    # Handle primitive types (int, float, str, bool, etc.)
+    try:
+        is_equal = val1 == val2
+        
+        # Handle the case where == returns an array (shouldn't happen here but be safe)
+        if isinstance(is_equal, (np.ndarray, np.bool_)):
+            is_equal = bool(is_equal.all() if hasattr(is_equal, 'all') else is_equal)
+        
+        if not is_equal:
+            return False, {
+                'type': f'{type(val1).__name__}_value_mismatch',
+                'path': path,
+                'value1': str(val1)[:200],  # Truncate long values
+                'value2': str(val2)[:200]
+            }
+        return True, None
+    except Exception as e:
+        return False, {
+            'type': 'comparison_error',
+            'path': path,
+            'value1_type': type(val1).__name__,
+            'value2_type': type(val2).__name__,
+            'error': str(e)
+        }
+
+
+def compare_cache_files(cache_path1: Path | str, cache_path2: Path | str, verbose: bool = True) -> dict:
+    """Compare two cache files and return detailed comparison results.
+    
+    Args:
+        cache_path1: Path to first cache file
+        cache_path2: Path to second cache file
+        verbose: If True, print comparison results
+        
+    Returns:
+        dict: Comparison results with keys:
+            - 'file_sizes_match': bool - Whether file sizes are the same
+            - 'keys_match': bool - Whether cache keys are the same
+            - 'lengths_match': bool - Whether number of items are the same
+            - 'content_match': bool - Whether cache content is identical
+            - 'size1': int - File size of first cache
+            - 'size2': int - File size of second cache
+            - 'keys1': set - Keys in first cache
+            - 'keys2': set - Keys in second cache
+            - 'keys_only_in_1': set - Keys only in first cache
+            - 'keys_only_in_2': set - Keys only in second cache
+            - 'length1': int - Number of items in first cache
+            - 'length2': int - Number of items in second cache
+            - 'differences': dict - Detailed differences for each key
+    """
+    cache_path1 = Path(cache_path1)
+    cache_path2 = Path(cache_path2)
+    
+    result = {
+        'file_sizes_match': False,
+        'keys_match': False,
+        'lengths_match': False,
+        'content_match': False,
+        'differences': {}
+    }
+    
+    # Check if files exist
+    if not cache_path1.exists():
+        print(f"❌ Error: Cache file 1 not found: {cache_path1}")
+        return result
+    
+    if not cache_path2.exists():
+        print(f"❌ Error: Cache file 2 not found: {cache_path2}")
+        return result
+    
+    try:
+        # 1. Compare file sizes
+        size1 = cache_path1.stat().st_size
+        size2 = cache_path2.stat().st_size
+        result['size1'] = size1
+        result['size2'] = size2
+        result['file_sizes_match'] = size1 == size2
+        
+        # 2. Load cache files
+        cache1 = np.load(str(cache_path1), allow_pickle=True).item()
+        cache2 = np.load(str(cache_path2), allow_pickle=True).item()
+        
+        # 3. Compare keys
+        keys1 = set(cache1.keys())
+        keys2 = set(cache2.keys())
+        result['keys1'] = keys1
+        result['keys2'] = keys2
+        result['length1'] = len(keys1)
+        result['length2'] = len(keys2)
+        result['keys_match'] = keys1 == keys2
+        result['lengths_match'] = len(keys1) == len(keys2)
+        
+        keys_only_in_1 = keys1 - keys2
+        keys_only_in_2 = keys2 - keys1
+        result['keys_only_in_1'] = keys_only_in_1
+        result['keys_only_in_2'] = keys_only_in_2
+        
+        # 4. Compare content for common keys using recursive comparison
+        content_match = True
+        common_keys = keys1 & keys2
+        
+        for key in common_keys:
+            val1 = cache1[key]
+            val2 = cache2[key]
+            
+            # Use recursive comparison
+            is_equal, diff_info = _compare_values_recursive(val1, val2, path=f"cache.{key}")
+            
+            if not is_equal:
+                result['differences'][key] = diff_info
+                content_match = False
+        
+        result['content_match'] = content_match and len(keys_only_in_1) == 0 and len(keys_only_in_2) == 0
+        
+        # 5. Print results if verbose
+        if verbose:
+            print("\n" + "=" * 80)
+            print("CACHE FILE COMPARISON RESULTS")
+            print("=" * 80)
+            
+            print(f"\nFile 1: {cache_path1}")
+            print(f"File 2: {cache_path2}")
+            
+            # File sizes
+            print(f"\n📊 File Sizes:")
+            print(f"  Cache 1: {size1:,} bytes")
+            print(f"  Cache 2: {size2:,} bytes")
+            print(f"  Match: {'✅ YES' if result['file_sizes_match'] else '❌ NO'}")
+            
+            # Keys and length
+            print(f"\n🔑 Keys & Length:")
+            print(f"  Cache 1 keys: {result['length1']} ({keys1})")
+            print(f"  Cache 2 keys: {result['length2']} ({keys2})")
+            print(f"  Keys match: {'✅ YES' if result['keys_match'] else '❌ NO'}")
+            print(f"  Length match: {'✅ YES' if result['lengths_match'] else '❌ NO'}")
+            
+            if keys_only_in_1:
+                print(f"  ⚠️  Keys only in Cache 1: {keys_only_in_1}")
+            if keys_only_in_2:
+                print(f"  ⚠️  Keys only in Cache 2: {keys_only_in_2}")
+            
+            # Content comparison
+            print(f"\n📦 Content:")
+            if result['differences']:
+                print(f"  Differences found in {len(result['differences'])} keys:")
+                for key, diff in result['differences'].items():
+                    print(f"    - {key}: {diff}")
+            else:
+                if result['content_match']:
+                    print(f"  ✅ All common keys have identical content")
+            
+            # Overall result
+            print(f"\n{'=' * 80}")
+            if result['content_match'] and result['file_sizes_match']:
+                print("✅ CACHES ARE IDENTICAL")
+            elif result['keys_match'] and result['lengths_match']:
+                print("⚠️  CACHES HAVE SAME STRUCTURE BUT DIFFERENT CONTENT")
+            else:
+                print("❌ CACHES ARE DIFFERENT (different structure)")
+            print("=" * 80 + "\n")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error loading cache files: {e}")
+        return result

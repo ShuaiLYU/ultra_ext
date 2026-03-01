@@ -245,3 +245,27 @@ def read_im_rgb(img_path):
     return np.array(Image.open(img_path).convert("RGB"))
 
 
+
+
+def super_print(name, value):
+    """Print detailed information about a variable, including type, shape, dtype, and device if applicable."""
+    if isinstance(value, torch.Tensor):
+        print(f"{name}: shape={value.shape}, dtype={value.dtype}, device={value.device}")
+    elif isinstance(value, np.ndarray):
+        print(f"{name}: shape={value.shape}, dtype={value.dtype}")
+    elif isinstance(value, list):
+        print(f"{name}: list of length {len(value)}")
+        super_print(f"{name} [0]", value[0])
+    elif isinstance(value, dict):
+        print(f"{name}: dict with keys {list(value.keys())}")
+        for k, v in value.items():
+            super_print(f"{name}['{k}']", v)
+    elif isinstance(value, tuple):
+        print(f"{name}: tuple of length {len(value)}")
+        super_print(f"{name} [0]", value[0])
+    elif isinstance(value, Image.Image):
+        print(f"{name}: PIL Image with size {value.size} and mode {value.mode}")
+    elif isinstance(value, int) or isinstance(value, float) or isinstance(value, str):
+        print(f"{name}: {value} ({type(value).__name__})")
+    else:
+        print(f"{name}: {value} (type: {type(value).__name__})")

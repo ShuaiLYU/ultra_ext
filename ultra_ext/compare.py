@@ -27,8 +27,8 @@ def compare_weights(pt1, pt2):
     from pathlib import Path
     from ultralytics.utils.torch_utils import strip_optimizer
 
-    # strip_optimizer(file1)
-    # strip_optimizer(file2)
+    strip_optimizer(file1)
+    strip_optimizer(file2)
 
 
     print("=== File Sizes ===")
@@ -39,9 +39,12 @@ def compare_weights(pt1, pt2):
         size2 = os.path.getsize(file2) / (1024**2)  # MB
         print(f"Model 2 ({file2}): {size2:.2f} MB")
 
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # 加载两个模型文件
-    model1 = torch.load(file1, weights_only=False)
-    model2 = torch.load(file2, weights_only=False)
+    model1 = torch.load(file1, weights_only=False, map_location=device)
+
+    model2 = torch.load(file2, weights_only=False, map_location=device)
 
     # 1. Check keys contained in files (determine if training state exists)
     print("=== Model 1 Contents ===")
@@ -683,6 +686,80 @@ def compare_cache_files(cache_path1: Path | str, cache_path2: Path | str, verbos
                 print("⚠️  CACHES HAVE SAME STRUCTURE BUT DIFFERENT CONTENT")
             else:
                 print("❌ CACHES ARE DIFFERENT (different structure)")
+            print("=" * 80 + "\n")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error loading cache files: {e}")
+        return result
+
+
+# compare the labels in the cache files to see if they are the same
+def compare_cache_labels(cache_path1: Path | str, cache_path2: Path | str, verbose: bool = True) -> dict:
+    """Compare labels in two cache files and return comparison results.
+    
+    Args:
+        cache_path1: Path to first cache file
+        cache_path2: Path to second cache file
+        verbose: If True, print comparison results
+    """
+    cache_path1 = Path(cache_path1)
+    cache_path2 = Path(cache_path2)
+    
+    result = {
+        'labels_match': False,
+        'labels1': None,
+        'labels2': None,
+        'differences': None
+    }
+    
+    # Check if files exist
+    if not cache_path1.exists():
+        print(f"❌ Error: Cache file 1 not found: {cache_path1}")
+        return result
+    
+    if not cache_path2.exists():
+        print(f"❌ Error: Cache file 2 not found: {cache_path2}")
+        return result
+    
+    try:
+        # Load cache files
+        cache1 = np.load(str(cache_path1), allow_pickle=True).item()
+        cache2 = np.load(str(cache_path2), allow_pickle=True).item()
+        
+        # Extract labels (assuming they are under a key like 'labels' or similar)
+        labels1 = cache1.get('labels', None)
+        labels2 = cache2.get('labels', None)
+        
+        result['labels1'] = labels1
+        result['labels2'] = labels2
+        
+        if labels1 is None or labels2 is None:
+            print("⚠️  One or both caches do not contain 'labels' key")
+            return result
+        
+        # Compare labels using recursive comparison
+        is_equal, diff_info = _compare_values_recursive(labels1, labels2, path="cache.labels")
+        
+        result['labels_match'] = is_equal
+        result['differences'] = diff_info
+        
+        # Print results if verbose
+        if verbose:
+            print("\n" + "=" * 80)
+            print("CACHE LABELS COMPARISON RESULTS")
+            print("=" * 80)
+            
+            print(f"\nFile 1: {cache_path1}")
+            print(f"File 2: {cache_path2}")
+            
+            if is_equal:
+                print("\n✅ Labels match exactly")
+            else:
+                print("\n❌ Labels do NOT match:")
+                print(f"Difference info: {diff_info}")
+            
             print("=" * 80 + "\n")
         
         return result

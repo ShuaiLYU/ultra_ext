@@ -1,6 +1,19 @@
 
 import numpy as np
 
+
+
+# class ModelWeightZoo:
+
+	
+# 	weights=[	
+# 		"yoloe-26l-seg.pt",
+# 		"./runs/yoloe26_tp_ojb365/baseline/weights/best.pt",
+
+# 		]
+
+
+
 class TestSample:
 	visual_prompts = [
 		  
@@ -113,11 +126,14 @@ def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		names = kwargs.pop("names", ["bus", "man"])
 		model.set_classes(names, model.get_text_pe(names))
 
+		save_path = kwargs.pop("save_path", f"./runs/temp/tp_{os.path.basename(model_weight).replace('.pt', '')}_pred.png")
+		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+
 		print(f"kwargs: {kwargs}")
 		res = model.predict(**kwargs)[0]
 
-		save_path = kwargs.get("save_path", f"./runs/temp/tp_{model_weight.replace('.pt', '')}_pred.png")
-		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
 		res.save(save_path)
 
 		return save_path
@@ -153,11 +169,11 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		kwargs["visual_prompts"] = kwargs.get("visual_prompts", TestSample.get_visual_prompt(0)["prompts"])
 		kwargs["predictor"] = kwargs.get("predictor", YOLOEVPSegPredictor)
 
-		res = model.predict(**kwargs)[0]
-
-		# ✅ 改为 vp，避免与 tp 冲突
-		save_path = kwargs.get("save_path", f"./runs/temp/vp_{model_weight.replace('.pt', '')}_pred.png")
+		save_path = kwargs.pop("save_path", f"./runs/temp/vp_{os.path.basename(model_weight).replace('.pt', '')}_pred.png")
 		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+
+		res = model.predict(**kwargs)[0]
 		res.save(save_path)
 
 		return save_path

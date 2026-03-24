@@ -14,7 +14,6 @@ from typing import Optional, Tuple, List
 
 import requests
 from PIL import Image
-from datasets import load_dataset
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -94,7 +93,8 @@ class RefCOCO:
             dataset_name: HuggingFace dataset name (default: 'jxu124/refcoco')
         """
         print(f"Loading RefCOCO dataset: {dataset_name} ({split} split)...")
-        self.dataset = load_dataset(dataset_name, split=split)
+        from datasets import load_dataset as _load_dataset
+        self.dataset = _load_dataset(dataset_name, split=split)
         self.coco = COCO2014()
         self.split = split
         print(f"  Loaded {len(self.dataset)} samples")

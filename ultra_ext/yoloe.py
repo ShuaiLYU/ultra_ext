@@ -117,7 +117,13 @@ def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 	try:
 		kwargs["source"] = kwargs.get("source", "ultralytics/assets/bus.jpg")
 		
-		model = YOLO(model_weight)
+
+		model_yaml=kwargs.pop("model_yaml",None)
+		if model_yaml:
+			model=YOLOE(model_yaml).load(model_weight)
+		else:
+			model = YOLO(model_weight)
+
 		
 		clip_weight_name = kwargs.pop("clip_weight_name", None)
 		if clip_weight_name:
@@ -157,7 +163,11 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		str: Path to saved result image
 	"""
 	try:
-		model = YOLO(model_weight)
+		model_yaml=kwargs.pop("model_yaml",None)
+		if model_yaml:
+			model=YOLOE(model_yaml).load(model_weight)
+		else:
+			model = YOLOE(model_weight)
 
 		clip_weight_name = kwargs.pop("clip_weight_name", None)
 		if clip_weight_name:
@@ -217,5 +227,3 @@ def print_model_head_cv4(model_weight):
 
 		print(f"logit_scale: {m.logit_scale.item()}")
 		print(f"bias: {m.bias}")
-
-

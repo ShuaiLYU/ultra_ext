@@ -221,7 +221,8 @@ class Object365V1Dataset:
         yoloe_model: str | None = None,
         yoloe_names: list[str] | None = None,
         yoloe_conf: float = 0.1,
-        max_samples=None
+        max_samples=None,
+        mode="text"
     ) -> None:
         """
         Iterate all images containing `cls_id` and save them (with optional
@@ -238,7 +239,12 @@ class Object365V1Dataset:
             yoloe_model:  path to YOLOE weights (e.g. "yoloe-26l-seg.pt")
             yoloe_names:  class name list passed to YOLOE; defaults to [cls_name]
             yoloe_conf:   confidence threshold for YOLOE prediction
+            mode:        "text" (default) or "visual"
         """
+
+        assert mode in ("text", "visual"), f"invalid mode: {mode}"
+
+
         cls_id = self._resolve_cls(cls_id)
         cls_name = self.cls_names[cls_id]
         save_dir = Path(save_dir)
@@ -251,11 +257,15 @@ class Object365V1Dataset:
         _yoloe = None
         if yoloe_model is not None:
             from ultralytics import YOLO,YOLOE
-            # _yoloe = YOLO(yoloe_model)
+
+            # _yoloe = YOLO(yoloe_model)   
             _yoloe = YOLOE(yoloe_model)  
-            _names = yoloe_names or [cls_name]
-            _yoloe.set_classes(_names, _yoloe.get_text_pe(_names))
-            print(f"[info] YOLOE model loaded: {yoloe_model}, names={_names}")
+
+            if mode == "text":
+                _names = yoloe_names or [cls_name]
+                _yoloe.set_classes(_names, _yoloe.get_text_pe(_names))
+                print(f"[info] YOLOE model loaded: {yoloe_model}, names={_names}")
+   
 
         skipped = 0
         for sample in tqdm(samples, desc=f"Exporting '{cls_name}'", unit="img"):
@@ -277,8 +287,28 @@ class Object365V1Dataset:
 
             if _yoloe is not None:
                 # res.plot() returns a BGR numpy array with detections drawn
-                res = _yoloe.predict(source=str(sample.img_path), conf=yoloe_conf, verbose=False)[0]
-                pred_img = res.plot()
+                if mode == "text":
+                    res = _yoloe.predict(source=str(sample.img_path), conf=yoloe_conf, verbose=False)[0]
+                    pred_img = res.plot()
+                else:
+                    bboxes=self._load_bboxes_for_cls(sample.label_path, cls_id, w, h)
+                    visual_prompts = dict(
+                        bboxes=np.array(bboxes[0])[None],
+                        cls=np.array([0]),
+                    )
+
+                    res = _yoloe.predict(source=str(sample.img_path), conf=yoloe_conf, 
+                                           visual_prompts=visual_prompts,verbose=False)[0]
+
+                    pred_img = res.plot()
+                    
+
+                    # draw visual_prompts 
+                    for cls,bbox in zip(visual_prompts["cls"],visual_prompts["bboxes"]):
+                        x1,y1,x2,y2=bbox.tolist()
+                        cv2.rectangle(pred_img, (int(x1), int(y1)), (int(x2), int(y2)), (0,255,0), line_width)
+                        cv2.putText(pred_img, f"prompt_cls{cls}", (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+
 
                 # resize prediction panel to match GT panel height
                 gt_h, gt_w = img.shape[:2]

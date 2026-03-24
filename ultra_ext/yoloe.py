@@ -227,3 +227,28 @@ def print_model_head_cv4(model_weight):
 
 		print(f"logit_scale: {m.logit_scale.item()}")
 		print(f"bias: {m.bias}")
+
+
+
+
+def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
+	from ultralytics import YOLOE
+
+	if model_yaml:
+		model=YOLOE(model_yaml).load(model_weight)
+	else:
+		model=YOLOE(model_weight)
+
+	model.set_classes(["bus", "person"], model.get_text_pe(["bus", "person"]))
+
+	res=model.predict(source="ultralytics/assets/bus.jpg")[0]
+
+	res.save(f"./runs/temp/123456_pred.png")
+
+	
+	from ultra_ext.utils import open_in_vscode
+
+	open_in_vscode("./runs/temp/123456_pred.png")
+
+
+	

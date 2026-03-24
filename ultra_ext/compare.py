@@ -20,15 +20,15 @@ def compare_weights(pt1, pt2):
 
     print("=== File Sizes ===")
 
-    from ultralytics.utils.torch_utils import strip_optimizer
-    strip_optimizer(file2) # remove ema weight to avoid conflict
+    # from ultralytics.utils.torch_utils import strip_optimizer
+    # strip_optimizer(file2) # remove ema weight to avoid conflict
 
 
-    from pathlib import Path
-    from ultralytics.utils.torch_utils import strip_optimizer
+    # from pathlib import Path
+    # from ultralytics.utils.torch_utils import strip_optimizer
 
-    strip_optimizer(file1)
-    strip_optimizer(file2)
+    # strip_optimizer(file1)
+    # strip_optimizer(file2)
 
 
     print("=== File Sizes ===")
@@ -767,3 +767,86 @@ def compare_cache_labels(cache_path1: Path | str, cache_path2: Path | str, verbo
     except Exception as e:
         print(f"❌ Error loading cache files: {e}")
         return result
+
+
+
+
+"""
+比较两个模型的网络结构，输出 CSV 表格，并打印不一样的层。
+"""
+import csv
+import torch
+from collections import Counter
+
+
+def compare_arch(pt1: str, pt2: str, out_csv: str = None):
+    def get_arch(path):
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
+        m = (ckpt.get("model") or ckpt.get("ema")) if isinstance(ckpt, dict) else ckpt
+        assert m is not None, f"{path}: 找不到 model"
+        sd = m.state_dict()
+        return {k: (tuple(v.shape), str(v.dtype)) for k, v in sd.items()}
+
+    print(f"Loading pt1: {pt1}")
+    arch1 = get_arch(pt1)
+    print(f"Loading pt2: {pt2}")
+    arch2 = get_arch(pt2)
+
+    all_keys = sorted(arch1.keys() | arch2.keys())
+
+    rows = []
+    for k in all_keys:
+        in1, in2 = k in arch1, k in arch2
+        shape1, dtype1 = arch1[k] if in1 else ("—", "—")
+        shape2, dtype2 = arch2[k] if in2 else ("—", "—")
+
+        if   not in1:          status = "only_in_2"
+        elif not in2:          status = "only_in_1"
+        elif shape1 != shape2: status = "shape_diff"
+        elif dtype1 != dtype2: status = "dtype_diff"
+        else:                  status = "same"
+
+        rows.append(dict(key=k,
+                         shape_1=str(shape1), dtype_1=dtype1,
+                         shape_2=str(shape2), dtype_2=dtype2,
+                         status=status))
+    if out_csv is not None:
+        with open(out_csv, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["key","shape_1","dtype_1","shape_2","dtype_2","status"])
+            w.writeheader()
+            w.writerows(rows)
+
+    cnt = Counter(r["status"] for r in rows)
+    if out_csv is not None:
+        print(f"\n✅ 已写出: {out_csv}  ({len(rows)} 行)")
+    print(f"   same       : {cnt['same']}")
+    print(f"   shape_diff : {cnt['shape_diff']}")
+    print(f"   dtype_diff : {cnt['dtype_diff']}")
+    print(f"   only_in_1  : {cnt['only_in_1']}  (pt1 独有，pt2 缺失)")
+    print(f"   only_in_2  : {cnt['only_in_2']}  (pt2 独有，pt1 缺失)")
+
+    # 打印不一样的层
+    diff_rows = [r for r in rows if r["status"] != "same"]
+    if diff_rows:
+        print(f"\n{'─'*130}")
+        print(f"{'差异层列表':^130}")
+        print(f"{'─'*130}")
+        print(f"{'status':<12} {'key':<70} {'shape_1':<22} {'shape_2':<22} {'dtype_1':<14} {'dtype_2'}")
+        print(f"{'─'*130}")
+        # 按 status 分组排序：only_in_1 / only_in_2 / shape_diff / dtype_diff
+        order = {"only_in_1": 0, "only_in_2": 1, "shape_diff": 2, "dtype_diff": 3}
+        for r in sorted(diff_rows, key=lambda x: (order.get(x["status"], 9), x["key"])):
+            print(f"{r['status']:<12} {r['key']:<70} {r['shape_1']:<22} {r['shape_2']:<22} {r['dtype_1']:<14} {r['dtype_2']}")
+        print(f"{'─'*130}")
+    else:
+        print("\n✅ 两个模型结构完全一致，无差异层。")
+
+    # 打印 train_args 里记录的原始 yaml
+    ckpt1 = torch.load(pt1, map_location="cpu", weights_only=False)
+    if isinstance(ckpt1, dict) and "train_args" in ckpt1:
+        print(f"\n📋 pt1 训练时使用的 yaml: {ckpt1['train_args'].get('model', '未记录')}")
+
+if __name__ == "__main__":
+
+
+    pass

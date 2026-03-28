@@ -846,6 +846,59 @@ def compare_arch(pt1: str, pt2: str, out_csv: str = None):
     if isinstance(ckpt1, dict) and "train_args" in ckpt1:
         print(f"\n📋 pt1 训练时使用的 yaml: {ckpt1['train_args'].get('model', '未记录')}")
 
+
+
+
+def count_bias_modlules(pt):
+    """
+    Count how many modules have bias parameters, split by conv vs BN.
+
+    Args:
+        model: nn.Module (or a loaded checkpoint dict with key 'model')
+
+    Returns:
+        dict with keys: total, conv, bn, other
+    """
+    import torch.nn as nn
+
+    model = torch.load(pt, weights_only=False, map_location="cpu")
+
+    if isinstance(model, dict):
+        model = model.get("model") or model.get("ema")
+
+    conv_types = (nn.Conv1d, nn.Conv2d, nn.Conv3d,
+                  nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d)
+    bn_types   = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
+                  nn.SyncBatchNorm, nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm1d,
+                  nn.InstanceNorm2d, nn.InstanceNorm3d)
+
+    total = conv_count = bn_count = other_count = 0
+
+    for name, module in model.named_modules():
+        bias = getattr(module, "bias", None)
+        if bias is None:
+            continue
+        # bias exists but may be disabled (set to None via bias=False)
+        if not isinstance(bias, nn.Parameter):
+            continue
+
+        total += 1
+        if isinstance(module, conv_types):
+            conv_count += 1
+        elif isinstance(module, bn_types):
+            bn_count += 1
+        else:
+            other_count += 1
+
+    result = dict(total=total, conv=conv_count, bn=bn_count, other=other_count)
+
+    print("=== Bias Module Count ===")
+    print(f"  Total modules with bias : {total}")
+    print(f"  Conv  (Conv1/2/3d etc.) : {conv_count}")
+    print(f"  BN    (BN/GN/LN etc.)  : {bn_count}")
+    print(f"  Other                   : {other_count}")
+
+    return result
 if __name__ == "__main__":
 
 

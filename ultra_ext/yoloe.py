@@ -250,5 +250,18 @@ def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
 
 	open_in_vscode("./runs/temp/123456_pred.png")
 
+def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
+	from ultralytics import YOLOE
+	from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor, YOLOEVPDetectPredictor
+	if model_yaml:
+		model=YOLOE(model_yaml).load(model_weight)
+	else:
+		model=YOLOE(model_weight)
+	res=model.predict(source=TestSample.get_visual_prompt(0)["image"],
+					  visual_prompts=TestSample.get_visual_prompt(0)["prompts"],
+					  predictor=YOLOEVPSegPredictor)[0]
 
+	res.save(f"./runs/temp/123456_vp_pred.png")
+	from ultra_ext.utils import open_in_vscode
+	open_in_vscode("./runs/temp/123456_vp_pred.png")
 	

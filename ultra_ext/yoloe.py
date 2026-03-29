@@ -231,7 +231,7 @@ def print_model_head_cv4(model_weight):
 
 
 
-def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
+def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_open=True):
 	from ultralytics import YOLOE
 
 	if model_yaml:
@@ -243,14 +243,16 @@ def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
 
 	res=model.predict(source="ultralytics/assets/bus.jpg")[0]
 
-	res.save(f"./runs/temp/123456_pred.png")
+	res_path=f"./runs_temp/123456_tp_pred_{model_weight.split('/')[-1]}.png"
 
-	
-	from ultra_ext.utils import open_in_vscode
+	os.makedirs(os.path.dirname(res_path), exist_ok=True)
+	res.save(res_path)
 
-	open_in_vscode("./runs/temp/123456_pred.png")
+	if code_open:
+		from ultra_ext.utils import open_in_vscode
+		open_in_vscode(res_path)
 
-def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
+def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_open=True):
 	from ultralytics import YOLOE
 	from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor, YOLOEVPDetectPredictor
 	if model_yaml:
@@ -261,7 +263,9 @@ def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None):
 					  visual_prompts=TestSample.get_visual_prompt(0)["prompts"],
 					  predictor=YOLOEVPSegPredictor)[0]
 
-	res.save(f"./runs/temp/123456_vp_pred.png")
-	from ultra_ext.utils import open_in_vscode
-	open_in_vscode("./runs/temp/123456_vp_pred.png")
-	
+	res_path=f"./runs_temp/123456_vp_pred_{model_weight.split('/')[-1]}.png"
+	os.makedirs(os.path.dirname(res_path), exist_ok=True)
+	res.save(res_path)
+	if code_open:
+		from ultra_ext.utils import open_in_vscode
+		open_in_vscode(res_path)

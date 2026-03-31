@@ -1,4 +1,6 @@
 
+from pyexpat import model
+
 import numpy as np
 
 
@@ -252,15 +254,22 @@ def test_yoloe26_tp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_op
 		from ultra_ext.utils import open_in_vscode
 		open_in_vscode(res_path)
 
-def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_open=True):
+def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_open=True,**kwargs):
 	from ultralytics import YOLOE
 	from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor, YOLOEVPDetectPredictor
 	if model_yaml:
 		model=YOLOE(model_yaml).load(model_weight)
 	else:
 		model=YOLOE(model_weight)
+	
+	end2end=kwargs.pop("end2end", True)
+
+	if not end2end:
+		model.model.end2end=False
+
 	res=model.predict(source=TestSample.get_visual_prompt(0)["image"],
 					  visual_prompts=TestSample.get_visual_prompt(0)["prompts"],
+                      **kwargs,
 					  predictor=YOLOEVPSegPredictor)[0]
 
 	res_path=f"./runs_temp/123456_vp_pred_{model_weight.split('/')[-1]}.png"
@@ -271,146 +280,268 @@ def test_yoloe26_vp_main(model_weight="yoloe-26l-seg.pt",model_yaml=None,code_op
 		open_in_vscode(res_path)
 
 
-def yoloe26_seg_flops():
 
-    from ultralytics import YOLOE
+
+
+
+def yoloev8_flops():
+
     from ultralytics import YOLO
 
-
-    model_weight="yoloe-26n-seg.pt"
-    model=YOLO(model_weight)
-    model.info()
-    non_e2e_model=YOLO(model_weight)
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-
-
-    model_weight="yoloe-26s-seg.pt"
-    model=YOLO(model_weight)
-    model.info()
-    non_e2e_model=YOLO(model_weight)
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-    
-    model_weight="yoloe-26m-seg.pt"
-    model=YOLO(model_weight)
-    model.info()
-    non_e2e_model=YOLO(model_weight)
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-
-    model_weight="yoloe-26l-seg.pt"
-    model=YOLO(model_weight)
-    model.info()
-    non_e2e_model=YOLO(model_weight)
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-
-    model_weight="yoloe-26x-seg.pt"
-    model=YOLO(model_weight)
-    model.info()
-    non_e2e_model=YOLO(model_weight)
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-
-    # YOLOe-26n-seg summary (fused): 203 layers, 5,604,156 parameters, 2,019,252 gradients, 11.5 GFLOPs
-    # YOLOe-26n-seg summary (fused): 203 layers, 5,604,156 parameters, 2,019,252 gradients, 9.7 GFLOPs
-    # YOLOe-26s-seg summary (fused): 203 layers, 15,251,380 parameters, 2,315,892 gradients, 39.0 GFLOPs
-    # YOLOe-26s-seg summary (fused): 203 layers, 15,251,380 parameters, 2,315,892 gradients, 35.2 GFLOPs
-    # YOLOe-26m-seg summary (fused): 213 layers, 34,889,124 parameters, 3,174,900 gradients, 135.6 GFLOPs
-    # YOLOe-26m-seg summary (fused): 213 layers, 34,889,124 parameters, 3,174,900 gradients, 123.4 GFLOPs
-    # YOLOe-26l-seg summary (fused): 271 layers, 39,285,412 parameters, 0 gradients, 153.8 GFLOPs
-    # YOLOe-26l-seg summary (fused): 271 layers, 39,285,412 parameters, 0 gradients, 141.6 GFLOPs
-    # YOLOe-26x-seg summary (fused): 271 layers, 85,337,444 parameters, 4,164,980 gradients, 342.0 GFLOPs
-    # YOLOe-26x-seg summary (fused): 271 layers, 85,337,444 parameters, 4,164,980 gradients, 316.3 GFLOPs
-
-  	# ── With segmentation head ────────────────────────────────────────────────
-    # | Model           | Layers | Params (M) | Grads (M) | GFLOPs (E2E) | GFLOPs (non-E2E) |
-    # |-----------------|--------|------------|-----------|--------------|------------------|
-    # | YOLOE-26n-seg   |  203   |    5.60    |   2.02    |    11.5      |       9.7        |
-    # | YOLOE-26s-seg   |  203   |   15.25    |   2.32    |    39.0      |      35.2        |
-    # | YOLOE-26m-seg   |  213   |   34.89    |   3.17    |   135.6      |     123.4        |
-    # | YOLOE-26l-seg   |  271   |   39.29    |   0.00    |   153.8      |     141.6        |
-    # | YOLOE-26x-seg   |  271   |   85.34    |   4.16    |   342.0      |     316.3        |
+    for model_weight in ["yoloe-v8s-seg.pt","yoloe-v8m-seg.pt","yoloe-v8l-seg.pt"]:
+        for mode in ["tp","vp"]:
+            model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
+            model_head=model.model.model[-1]
+            if mode=="vp":
+                del model_head.reprta
+            if mode=="tp":
+                del model_head.savpe
+            model.info()
 
 
-def yoloe26_flops():
+    # Transferred 448/448 items from pretrained weights
+    # YOLOe-v8s summary: 135 layers, 12,912,246 parameters, 12,912,230 gradients, 29.8 GFLOPs
+    # Transferred 448/448 items from pretrained weights
+    # YOLOe-v8s summary: 163 layers, 13,187,926 parameters, 13,187,910 gradients, 29.8 GFLOPs
+    # Transferred 568/568 items from pretrained weights
+    # YOLOe-v8m summary: 175 layers, 27,731,270 parameters, 27,731,254 gradients, 80.7 GFLOPs
+    # Transferred 568/568 items from pretrained weights
+    # YOLOe-v8m summary: 203 layers, 29,751,974 parameters, 29,751,958 gradients, 80.7 GFLOPs
+    # Transferred 688/688 items from pretrained weights
+    # YOLOe-v8l summary: 215 layers, 45,603,094 parameters, 45,603,078 gradients, 167.6 GFLOPs
+    # Transferred 688/688 items from pretrained weights
+    # YOLOe-v8l summary: 243 layers, 49,590,006 parameters, 49,589,990 gradients, 167.6 GFLOPs
+
+    # | Model      | Layers      | Params (M)    | GFLOPs          |
+    # |------------|-------------|---------------|-----------------|
+    # | YOLOE-v8s  | 135 / 163   | 12.3 / 12.6   |  29.8 /  29.8   |
+    # | YOLOE-v8m  | 175 / 203   | 26.4 / 28.4   |  80.7 /  80.7   |
+    # | YOLOE-v8l  | 215 / 243   | 43.5 / 47.3   | 167.6 / 167.6   |
+    # Layers / Params / GFLOPs: TP / VP, GFLOPs measured at 640x640 input
+
+def yoloe11_flops():
+
+    from ultralytics import YOLO
+
+    for model_weight in ["yoloe-11s-seg.pt","yoloe-11m-seg.pt","yoloe-11l-seg.pt"]:
+        for mode in ["tp","vp"]:
+            model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
+            model_head=model.model.model[-1]
+            if mode=="vp":
+                del model_head.reprta
+            if mode=="tp":
+                del model_head.savpe
+            model.info()
+
+
+    # Transferred 592/592 items from pretrained weights
+    # YOLOe-11s summary: 187 layers, 11,204,438 parameters, 11,204,422 gradients, 22.7 GFLOPs
+    # Transferred 592/592 items from pretrained weights
+    # YOLOe-11s summary: 215 layers, 11,480,118 parameters, 11,480,102 gradients, 22.7 GFLOPs
+    # Transferred 742/742 items from pretrained weights
+    # YOLOe-11m summary: 237 layers, 22,026,262 parameters, 22,026,246 gradients, 70.4 GFLOPs
+    # Transferred 742/742 items from pretrained weights
+    # YOLOe-11m summary: 265 layers, 26,013,174 parameters, 26,013,158 gradients, 70.4 GFLOPs
+    # Transferred 1108/1108 items from pretrained weights
+    # YOLOe-11l summary: 363 layers, 27,283,734 parameters, 27,283,718 gradients, 89.5 GFLOPs
+    # Transferred 1108/1108 items from pretrained weights
+    # YOLOe-11l summary: 391 layers, 31,270,646 parameters, 31,270,630 gradients, 89.5 GFLOPs
+
+    # | Model      | Layers      | Params (M)    | GFLOPs        |
+    # |------------|-------------|---------------|---------------|
+    # | YOLOE-11s  | 187 / 215   | 10.7 / 10.9   | 22.7 / 22.7   |
+    # | YOLOE-11m  | 237 / 265   | 21.0 / 24.8   | 70.4 / 70.4   |
+    # | YOLOE-11l  | 363 / 391   | 26.0 / 29.8   | 89.5 / 89.5   |
+    # Layers / Params / GFLOPs: TP / VP, GFLOPs measured at 640x640 input
+
+
+def yoloe26_not_e2e_flops():
 
     from ultralytics import YOLO
     names = ["bus", "man"]
 
-    model_weight="yoloe-26n-seg.pt"
-    model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
 
-    model.set_classes(names, model.get_text_pe(names))
-    model.info()
-    non_e2e_model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    non_e2e_model.set_classes(names, model.get_text_pe(names))
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
+    for model_weight in ["yoloe-26n-seg.pt","yoloe-26s-seg.pt","yoloe-26m-seg.pt", "yoloe-26l-seg.pt","yoloe-26x-seg.pt"]:
+
+        for mode in ["tp","vp"]:
+            
+            print(f"model_weight: {model_weight}, mode: {mode}")
+            model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
+            model.set_classes(names, model.get_text_pe(names))
+            model_head=model.model.model[-1]
+            if mode=="vp":
+                del model_head.reprta
+            if mode=="tp":
+                del model_head.savpe
+            del model_head.one2one_cv2
+            del model_head.one2one_cv3
+            del model_head.one2one_cv4
+
+            model.info()
 
 
-    model_weight="yoloe-26s-seg.pt"
-    model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    model.set_classes(names, model.get_text_pe(names))
-    model.info()
-    non_e2e_model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    non_e2e_model.set_classes(names, model.get_text_pe(names))
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
-    
-    model_weight="yoloe-26m-seg.pt"
-    model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    model.set_classes(names, model.get_text_pe(names))
-    model.info()
-    non_e2e_model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    non_e2e_model.set_classes(names, model.get_text_pe(names))
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
+    # model_weight: yoloe-26n-seg.pt, mode: tp
+    # Transferred 202/822 items from pretrained weights
+    # YOLOe-26n summary: 221 layers, 4,100,930 parameters, 4,100,930 gradients, 6.1 GFLOPs
+    # model_weight: yoloe-26n-seg.pt, mode: vp
+    # Transferred 202/822 items from pretrained weights
+    # YOLOe-26n summary: 249 layers, 3,223,234 parameters, 3,223,234 gradients, 6.1 GFLOPs
+    # model_weight: yoloe-26s-seg.pt, mode: tp
+    # Transferred 202/822 items from pretrained weights
+    # YOLOe-26s summary: 221 layers, 11,258,578 parameters, 11,258,578 gradients, 21.9 GFLOPs
+    # model_weight: yoloe-26s-seg.pt, mode: vp
+    # Transferred 202/822 items from pretrained weights
+    # YOLOe-26s summary: 249 layers, 11,534,258 parameters, 11,534,258 gradients, 21.9 GFLOPs
+    # model_weight: yoloe-26m-seg.pt, mode: tp
+    # Transferred 212/882 items from pretrained weights
+    # YOLOe-26m summary: 241 layers, 22,346,834 parameters, 22,346,834 gradients, 70.6 GFLOPs
+    # model_weight: yoloe-26m-seg.pt, mode: vp
+    # Transferred 212/882 items from pretrained weights
+    # YOLOe-26m summary: 269 layers, 26,333,746 parameters, 26,333,746 gradients, 70.6 GFLOPs
+    # model_weight: yoloe-26l-seg.pt, mode: tp
+    # Transferred 266/1206 items from pretrained weights
+    # YOLOe-26l summary: 353 layers, 26,750,290 parameters, 26,750,290 gradients, 89.0 GFLOPs
+    # model_weight: yoloe-26l-seg.pt, mode: vp
+    # Transferred 266/1206 items from pretrained weights
+    # YOLOe-26l summary: 381 layers, 30,737,202 parameters, 30,737,202 gradients, 89.0 GFLOPs
+    # model_weight: yoloe-26x-seg.pt, mode: tp
+    # Transferred 266/1206 items from pretrained weights
+    # YOLOe-26x summary: 353 layers, 57,850,354 parameters, 57,850,354 gradients, 197.7 GFLOPs
+    # model_weight: yoloe-26x-seg.pt, mode: vp
+    # Transferred 266/1206 items from pretrained weights
+    # YOLOe-26x summary: 381 layers, 68,399,314 parameters, 68,399,314 gradients, 197.7 GFLOPs
 
-    model_weight="yoloe-26l-seg.pt"
-    model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    model.set_classes(names, model.get_text_pe(names))
-    model.info()
-    non_e2e_model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    non_e2e_model.set_classes(names, model.get_text_pe(names))
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
 
-    model_weight="yoloe-26x-seg.pt"
-    model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    model.set_classes(names, model.get_text_pe(names))
-    model.info()
-    non_e2e_model=YOLO(model_weight.replace("-seg.pt",".yaml")).load(model_weight)
-    non_e2e_model.set_classes(names, model.get_text_pe(names))
-    non_e2e_model.model.end2end=False
-    non_e2e_model.info() 
+       # | Model      | Layers      | Params (M)    | GFLOPs          |
+    # |------------|-------------|---------------|-----------------|
+    # | YOLOE-26n  | 221 / 249   |  3.9 /  3.1   |   6.1 /   6.1   |
+    # | YOLOE-26s  | 221 / 249   | 10.7 / 11.0   |  21.9 /  21.9   |
+    # | YOLOE-26m  | 241 / 269   | 21.3 / 25.1   |  70.6 /  70.6   |
+    # | YOLOE-26l  | 353 / 381   | 25.5 / 29.3   |  89.0 /  89.0   |
+    # | YOLOE-26x  | 353 / 381   | 55.2 / 65.2   | 197.7 / 197.7   |
+    # Layers / Params / GFLOPs: TP / VP, GFLOPs measured at 640x640 input
+
+
+def yoloe26_seg_not_e2e_flops():
+
+    from ultralytics import YOLOE
+    from ultralytics import YOLO
+
+    from ultralytics import YOLO
+    names = ["bus", "man"]
+
+
+    for model_weight in ["yoloe-26n-seg.pt","yoloe-26s-seg.pt","yoloe-26m-seg.pt", "yoloe-26l-seg.pt","yoloe-26x-seg.pt"]:
+
+        for mode in ["tp","vp"]:
+            
+            print(f"model_weight: {model_weight}, mode: {mode}")
+            model=YOLO(model_weight)
+            model.set_classes(names, model.get_text_pe(names))
+            model_head=model.model.model[-1]
+            if mode=="vp":
+                del model_head.reprta
+            if mode=="tp":
+                del model_head.savpe
+            del model_head.one2one_cv2
+            del model_head.one2one_cv3
+            del model_head.one2one_cv4
+
+            model.info()
+
+    # model_weight: yoloe-26n-seg.pt, mode: tp
+    # YOLOe-26n-seg summary (fused): 154 layers, 4,645,546 parameters, 1,731,106 gradients, 9.7 GFLOPs
+    # model_weight: yoloe-26n-seg.pt, mode: vp
+    # YOLOe-26n-seg summary (fused): 172 layers, 3,767,114 parameters, 316,130 gradients, 9.7 GFLOPs
+    # model_weight: yoloe-26s-seg.pt, mode: tp
+    # YOLOe-26s-seg summary (fused): 154 layers, 12,736,530 parameters, 1,859,362 gradients, 35.2 GFLOPs
+    # model_weight: yoloe-26s-seg.pt, mode: vp
+    # YOLOe-26s-seg summary (fused): 172 layers, 13,011,042 parameters, 538,850 gradients, 35.2 GFLOPs
+    # model_weight: yoloe-26m-seg.pt, mode: tp
+    # YOLOe-26m-seg summary (fused): 164 layers, 27,535,938 parameters, 2,269,474 gradients, 123.4 GFLOPs
+    # model_weight: yoloe-26m-seg.pt, mode: vp
+    # YOLOe-26m-seg summary (fused): 182 layers, 31,520,530 parameters, 1,200,866 gradients, 123.4 GFLOPs
+    # model_weight: yoloe-26l-seg.pt, mode: tp
+    # YOLOe-26l-seg summary (fused): 222 layers, 31,932,226 parameters, 0 gradients, 141.6 GFLOPs
+    # model_weight: yoloe-26l-seg.pt, mode: vp
+    # YOLOe-26l-seg summary (fused): 240 layers, 35,916,818 parameters, 0 gradients, 141.6 GFLOPs
+    # model_weight: yoloe-26x-seg.pt, mode: tp
+    # YOLOe-26x-seg summary (fused): 222 layers, 69,499,970 parameters, 2,810,658 gradients, 316.3 GFLOPs
+    # model_weight: yoloe-26x-seg.pt, mode: vp
+    # YOLOe-26x-seg summary (fused): 240 layers, 80,045,458 parameters, 1,993,954 gradients, 316.3 GFLOPs
+
+	   # | Model          | Layers      | Params (M)    | GFLOPs          |
+    # |----------------|-------------|---------------|-----------------|
+    # | YOLOE-26n-seg  | 154 / 172   |  4.4 /  3.6   |   9.7 /   9.7   |
+    # | YOLOE-26s-seg  | 154 / 172   | 12.1 / 12.4   |  35.2 /  35.2   |
+    # | YOLOE-26m-seg  | 164 / 182   | 26.3 / 30.1   | 123.4 / 123.4   |
+    # | YOLOE-26l-seg  | 222 / 240   | 30.5 / 34.3   | 141.6 / 141.6   |
+    # | YOLOE-26x-seg  | 222 / 240   | 66.3 / 76.3   | 316.3 / 316.3   |
+    # Layers / Params / GFLOPs: TP / VP, GFLOPs measured at 640x640 input
+
+
+
+def yoloe26_pf_not_e2e_flops():
+
+    from ultralytics import YOLO
+    names = ["bus", "man"]
+
+
+    for model_weight in ["yoloe-26n-seg-pf.pt","yoloe-26s-seg-pf.pt","yoloe-26m-seg-pf.pt", "yoloe-26l-seg-pf.pt","yoloe-26x-seg-pf.pt"]:
+
+        for mode in ["tp","vp"]:
+            
+            print(f"model_weight: {model_weight}, mode: {mode}")
+            model=YOLO(model_weight)
+            model.set_classes(names, model.get_text_pe(names))
+            model_head=model.model.model[-1]
+            if mode=="vp":
+                del model_head.reprta
+            if mode=="tp":
+                del model_head.savpe
+            del model_head.one2one_cv2
+            del model_head.one2one_cv3
+            del model_head.one2one_cv4
+
+            model.info()
+
+
 	
-    # YOLOe-26n summary: 304 layers, 5,067,696 parameters, 5,067,696 gradients, 7.3 GFLOPs
-    # Transferred 202/864 items from pretrained weights
-    # YOLOe-26n summary: 304 layers, 5,067,696 parameters, 5,067,696 gradients, 6.1 GFLOPs
-    # Transferred 202/864 items from pretrained weights
-    # YOLOe-26s summary: 304 layers, 13,782,992 parameters, 13,782,992 gradients, 24.8 GFLOPs
-    # Transferred 202/864 items from pretrained weights
-    # YOLOe-26s summary: 304 layers, 13,782,992 parameters, 13,782,992 gradients, 21.9 GFLOPs
-    # Transferred 212/924 items from pretrained weights
-    # YOLOe-26m summary: 324 layers, 29,712,464 parameters, 29,712,464 gradients, 79.2 GFLOPs
-    # Transferred 212/924 items from pretrained weights
-    # YOLOe-26m summary: 324 layers, 29,712,464 parameters, 29,712,464 gradients, 70.6 GFLOPs
-    # Transferred 266/1248 items from pretrained weights
-    # YOLOe-26l summary: 436 layers, 34,115,920 parameters, 34,115,920 gradients, 97.6 GFLOPs
-    # Transferred 266/1248 items from pretrained weights
-    # YOLOe-26l summary: 436 layers, 34,115,920 parameters, 34,115,920 gradients, 89.0 GFLOPs
-    # Transferred 266/1248 items from pretrained weights
-    # YOLOe-26x summary: 436 layers, 73,703,408 parameters, 73,703,408 gradients, 215.2 GFLOPs
-    # Transferred 266/1248 items from pretrained weights
-    # YOLOe-26x summary: 436 layers, 73,703,408 parameters, 73,703,408 gradients, 197.7 GFLOPs
 
-	# ── Detection-only (no seg head) ──────────────────────────────────────────
-    # | Model       | Layers | Params (M) | Grads (M) | GFLOPs (E2E) | GFLOPs (non-E2E) |
-    # |-------------|--------|------------|-----------|--------------|------------------|
-    # | YOLOE-26n   |  304   |    5.07    |   5.07    |     7.3      |       6.1        |
-    # | YOLOE-26s   |  304   |   13.78    |  13.78    |    24.8      |      21.9        |
-    # | YOLOE-26m   |  324   |   29.71    |  29.71    |    79.2      |      70.6        |
-    # | YOLOE-26l   |  436   |   34.12    |  34.12    |    97.6      |      89.0        |
-    # | YOLOE-26x   |  436   |   73.70    |  73.70    |   215.2      |     197.7        |
+def yoloe26_pf_not_e2e_flops():
+
+    from ultralytics import YOLO
+    names = ["bus", "man"]
+
+
+    dirname="./weights/yoloe26_weight/yoloe26_pf"
+
+    for model_weight in ["yoloe26n_pf.pt","yoloe26s_pf.pt","yoloe26m_pf.pt","yoloe26l_pf.pt","yoloe26x_pf.pt"]:
+
+        model_weight=os.path.join(dirname,model_weight)
+        # print(f"model_weight: {model_weight}, mode: {mode}")
+        model=YOLO(model_weight)
+        model_head=model.model.model[-1]
+        del model_head.reprta
+
+        del model_head.one2one_cv2 
+        del model_head.one2one_cv3
+        del model_head.one2one_cv4    
+        # model.fuse()
+        model.info()
+
+
+    # YOLOe-26n summary: 219 layers, 2,383,407 parameters, 0 gradients,  5.3 GFLOPs
+    # YOLOe-26s summary: 219 layers, 9,482,319 parameters, 0 gradients, 20.8 GFLOPs
+    # YOLOe-26m summary: 239 layers, 20,374,351 parameters, 0 gradients, 68.4 GFLOPs
+    # YOLOe-26l summary: 351 layers, 24,777,807 parameters, 0 gradients, 86.8 GFLOPs
+    # YOLOe-26x summary: 351 layers, 55,681,647 parameters, 0 gradients, 194.4 GFLOPs
+
+    # | Model      | Layers | Params (M) | GFLOPs |
+    # |------------|--------|------------|--------|
+    # | YOLOE-26n  |  219   |    2.3     |   5.3  |
+    # | YOLOE-26s  |  219   |    9.0     |  20.8  |
+    # | YOLOE-26m  |  239   |   19.4     |  68.4  |
+    # | YOLOE-26l  |  351   |   23.6     |  86.8  |
+    # | YOLOE-26x  |  351   |   53.1     | 194.4  |
+    # Prompt-free mode (no TP/VP split), GFLOPs measured at 640x640 input

@@ -5,14 +5,57 @@ import numpy as np
 
 
 
-# class ModelWeightZoo:
 
+
+yoloe_train_data = {
+	"val": {
+		"yolo_data": [
+			"../datasets/lvis.yaml"
+		]
+	},
+	"train": {
+		"yolo_data": [
+			"../datasets/Objects365v1.yaml"
+		],
+		"grounding_data": [
+			{
+				"img_path": "../datasets/flickr/full_images/",
+				"json_file": "../datasets/flickr/annotations/final_flickr_separateGT_train_segm.json"
+			},
+			{
+				"img_path": "../datasets/mixed_grounding/gqa/images",
+				"json_file": "../datasets/mixed_grounding/annotations/final_mixed_train_no_coco_segm.json"
+			}
+		]
+	}
+}
+
+
+
+yoloe26_train_data = {
+	"val": {
+		"yolo_data": [
+			"/home/louis/ultra_louis_work/datasets/lvis.yaml"
+		]
+	},
 	
-# 	weights=[	
-# 		"yoloe-26l-seg.pt",
-# 		"./runs/yoloe26_tp_ojb365/baseline/weights/best.pt",
-
-# 		]
+	"train": {
+		"grounding_data": [
+			{
+				"img_path": "../datasets/flickr/full_images/",
+				"json_file": "../datasets/flickr/annotations/final_flickr_separateGT_train_segm.json"
+			},
+			{
+				"img_path": "../datasets/mixed_grounding/gqa/images",
+				"json_file": "../datasets/mixed_grounding/annotations/final_mixed_train_no_coco_segm.json"
+			},
+			{
+				"img_path": "../datasets/Objects365v1/images/train",
+				"json_file": "../datasets/Objects365v1/annotations/objects365_train_segm.json"
+			}
+		]
+	}
+}
 
 
 
@@ -183,9 +226,6 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 
 		save_path = kwargs.pop("save_path", f"./runs/temp/vp_{os.path.basename(model_weight).replace('.pt', '')}_pred.png")
 		os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-
-		res = model.predict(**kwargs)[0]
 		res.save(save_path)
 
 		return save_path

@@ -145,6 +145,160 @@ class TestSample:
 
 from ultralytics import YOLO,YOLOE
 
+
+
+def val_yoloe26_tp(model_weight,model_yaml=None,**kwargs):
+    """
+    validate yoloe26 with text prompt or visual prompt.
+    Args:
+        model_path: str, path to the model weight
+        mode: str, "text_prompt" or "visual_prompt"
+        end2end: bool, whether to use end2end model, default True. It will achieve better performance when end2end is False.
+    Returns:
+        model: YOLOE model with validation results. Access model.metrics for DetMetrics, model.val_stats for full COCO eval results
+    """
+    from ultralytics import YOLOE
+    # load model
+    if model_yaml:
+        model=YOLOE(model_yaml).load(model_weight)
+    else:
+        model=YOLOE(model_weight)
+
+
+    #end2end 
+    end2end=kwargs.pop("end2end", True)
+    if not end2end:
+        model.model.end2end = False
+        del model.model.model[-1].one2one_cv2
+        del model.model.model[-1].one2one_cv3
+        del model.model.model[-1].one2one_cv4
+
+    # model.args["clip_weight_name"]=kwargs.pop("clip_weight_name", "mobileclip2:b")
+
+    # arugments
+    kwargs["data"]=kwargs.get("data","../datasets/lvis.yaml")
+    kwargs["split"]=kwargs.get("split","minival")
+    kwargs["max_det"]=kwargs.get("max_det",1000)
+    kwargs["save_json"]=kwargs.get("save_json",True)
+    kwargs["device"]=kwargs.get("device","0")
+    kwargs["conf"]=kwargs.get("conf",0.001)
+    model.val(**kwargs)
+    return model
+
+
+# val_yoloe26_tp("yoloe-26l-seg.pt",device="cuda:7")
+"""
+Evaluating faster-coco-eval mAP using /home/louis/runs/segment/val/predictions.json and ../datasets/lvis/annotations/lvis_v1_minival.json...
+Evaluate annotation type *bbox*
+COCOeval_opt.evaluate() finished...
+DONE (t=17.61s).
+Accumulating evaluation results...
+COCOeval_opt.accumulate() finished...
+DONE (t=0.00s).
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.369
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.485
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.397
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.269
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.470
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.598
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  r] = 0.344
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  c] = 0.364
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  f] = 0.377
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 catIds=all] = 0.314
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 catIds=all] = 0.511
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.534
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.358
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.638
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.774
+ Average Recall     (AR) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.676
+ Average Recall     (AR) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.578
+Evaluate annotation type *segm*
+COCOeval_opt.evaluate() finished...
+DONE (t=33.04s).
+Accumulating evaluation results...
+COCOeval_opt.accumulate() finished...
+DONE (t=0.00s).
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.303
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.455
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.325
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.194
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.405
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.516
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  r] = 0.288
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  c] = 0.311
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  f] = 0.299
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 catIds=all] = 0.268
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 catIds=all] = 0.424
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.441
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.261
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.550
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.675
+ Average Recall     (AR) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.641
+ Average Recall     (AR) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.473
+
+"""
+
+def val_yoloe_tp(model_weight,model_yaml=None,**kwargs):
+    """
+    validate yoloe26 with text prompt or visual prompt.
+    Args:
+        model_path: str, path to the model weight
+        mode: str, "text_prompt" or "visual_prompt"
+        end2end: bool, whether to use end2end model, default True. It will achieve better performance when end2end is False.
+    Returns:
+        model: YOLOE model with validation results. Access model.metrics for DetMetrics, model.val_stats for full COCO eval results
+    """
+    from ultralytics import YOLOE
+
+    # load model
+    if model_yaml:
+        model=YOLOE(model_yaml).load(model_weight)
+    else:
+        model=YOLOE(model_weight)
+
+
+
+    # model.args["clip_weight_name"]=kwargs.pop("clip_weight_name", "mobileclip2:b")
+
+    # arugments
+    kwargs["data"]=kwargs.get("data","../datasets/lvis.yaml")
+    kwargs["split"]=kwargs.get("split","minival")
+    kwargs["max_det"]=kwargs.get("max_det",1000)
+    kwargs["save_json"]=kwargs.get("save_json",True)
+    kwargs["device"]=kwargs.get("device","0")
+    kwargs["conf"]=kwargs.get("conf",0.001)
+    model.val(**kwargs)
+    return model
+
+# val_yoloe_tp("yoloe-11l-seg.pt",model_yaml= "yoloe-11l.yaml",device="cuda:7")
+'''
+Evaluating faster-coco-eval mAP using /home/louis/runs/detect/val/predictions.json and ../datasets/lvis/annotations/lvis_v1_minival.json...
+Evaluate annotation type *bbox*
+COCOeval_opt.evaluate() finished...
+DONE (t=16.77s).
+Accumulating evaluation results...
+COCOeval_opt.accumulate() finished...
+DONE (t=0.00s).
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.354
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.466
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.383
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.256
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.452
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.596
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  r] = 0.303
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  c] = 0.350
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=  f] = 0.367
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 catIds=all] = 0.304
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 catIds=all] = 0.495
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 catIds=all] = 0.517
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 catIds=all] = 0.337
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 catIds=all] = 0.626
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 catIds=all] = 0.777
+ Average Recall     (AR) @[ IoU=0.50      | area=   all | maxDets=100 catIds=all] = 0.665
+ Average Recall     (AR) @[ IoU=0.75      | area=   all | maxDets=100 catIds=all] = 0.563
+'''
+
+
 def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 	"""Text Prompt prediction for YOLOE.
 	
@@ -191,6 +345,7 @@ def predict_yoloe_tp(model_weight="yoloe-26l-seg.pt", **kwargs):
 	except Exception as e:
 		print(f"❌ Error in predict_yoloe_tp: {e}")
 		raise
+
 
 
 def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
@@ -585,3 +740,47 @@ def yoloe26_pf_not_e2e_flops():
     # | YOLOE-26l  |  351   |   23.6     |  86.8  |
     # | YOLOE-26x  |  351   |   53.1     | 194.4  |
     # Prompt-free mode (no TP/VP split), GFLOPs measured at 640x640 input
+
+
+"""
+
+
+
+def get_text_feats(model_weight,texts,clip_weight_name="mobileclip2:b",without_reprta=True):
+    from ultralytics import YOLOE
+
+
+    if model_weight is not None:
+        model=YOLOE(model_weight)
+        model.args['clip_weight_name']=clip_weight_name
+        txt_feats=model.model.get_text_pe(texts, without_reprta=without_reprta).squeeze(0)
+    else:
+        from ultralytics.nn.text_model import OpenCLIP
+        import torch
+        assert clip_weight_name.endswith("mobileclip2_b.pt"), "当前仅支持 mobileclip2_b.pt 权重文件"
+        text_model=OpenCLIP("cuda",pretrained_path=clip_weight_name)
+        text_token = text_model.tokenize(texts)
+        batch=80
+        txt_feats = [text_model.encode_text(token).detach() for token in text_token.split(batch)]
+        txt_feats = txt_feats[0] if len(txt_feats) == 1 else torch.cat(txt_feats, dim=0)
+        txt_feats = txt_feats.reshape(-1, len(texts), txt_feats.shape[-1]).squeeze(0)
+
+
+    print("Text features shape:", txt_feats.shape)
+
+    feat1=txt_feats[0]
+    feat2=txt_feats[1]
+    print("feat1_norm:", feat1.norm(dim=-1, keepdim=True))
+    print("feat2_norm:", feat2.norm(dim=-1, keepdim=True))
+    # cal the cosine similarity between feat1 and feat2
+    feat1_norm=feat1 / feat1.norm(dim=-1, keepdim=True)
+    feat2_norm=feat2 / feat2.norm(dim=-1, keepdim=True)
+    cosine_sim=(feat1_norm * feat2_norm).sum(dim=-1)
+    # print the norms and cosine similarity
+
+    print("cosine_sim:", cosine_sim)
+
+    return txt_feats
+
+	
+"""

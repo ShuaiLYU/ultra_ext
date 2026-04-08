@@ -11,6 +11,16 @@ import numpy as np
 from pathlib import Path
 import math
 
+def set_ultra_workspace():
+
+    import ultralytics
+    import os 
+    dir=os.path.dirname(os.path.dirname(ultralytics.__file__))
+    os.chdir(dir)
+
+
+
+
 def split_detections_by_class(result) -> Dict[int, object]:
     """
     Split a YOLO detection result into separate results grouped by class.

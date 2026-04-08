@@ -784,3 +784,51 @@ def get_text_feats(model_weight,texts,clip_weight_name="mobileclip2:b",without_r
 
 	
 """
+
+
+
+def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp_seg",do_test=True,wait_input=True):	
+    """
+    Transfer a model trained with old branch to the new branch by resaving the model weight with the new code. This is to verify the compatibility of the model weight between the old and new code, and to test the performance of the resaved model. The function will resave both the detection model and the segmentation model, and test them if do_test is True. It will wait for user input before processing the next model if wait_input is True.
+    Args:
+        model_dir: str, the directory of the model weights
+        do_test: bool, whether to test the resaved model
+        wait_input: bool, whether to wait for user input before processing the next model
+    Returns:
+        None
+    """
+
+    scales=["26n","26s","26m","26l","26x"]
+
+    for scale in scales:
+
+        model_weight=f"{model_dir}/yoloe-{scale}-seg.pt"
+        from ultralytics.utils.torch_utils import strip_optimizer
+
+        # resave det model
+        strip_optimizer(model_weight)        
+        model_yaml=f"yoloe-{scale}.yaml"
+        resave_weight=os.path.join(model_dir,f"yoloe-{scale}-resave.pt")
+        YOLOE(model_yaml).load(model_weight).save(resave_weight)
+        print(f"Resaved {model_weight} to {resave_weight}")
+
+        # test resaved model
+        if do_test:
+            test_yoloe26_tp_main(model_weight=resave_weight,model_yaml=None,code_open=True)
+        # wait user input before processing next model
+        if wait_input:
+            input(f"Press Enter to continue to the next model...")
+
+
+        # resave seg model
+        seg_model_yaml=f"yoloe-{scale}-seg.yaml"
+        resave_seg_weight=os.path.join(model_dir,f"yoloe-{scale}-seg-resave.pt")
+        YOLOE(seg_model_yaml).load(model_weight).save(resave_seg_weight)
+        print(f"Resaved {model_weight} to {resave_seg_weight}")
+
+        # test resaved model
+        if do_test:
+            test_yoloe26_tp_main(model_weight=resave_seg_weight,model_yaml=None,code_open=True)
+        # wait user input before processing next model
+        if wait_input:
+            input(f"Press Enter to continue to the next model...")

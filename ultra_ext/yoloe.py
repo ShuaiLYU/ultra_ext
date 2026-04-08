@@ -787,16 +787,28 @@ def get_text_feats(model_weight,texts,clip_weight_name="mobileclip2:b",without_r
 
 
 
-def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp_seg",do_test=True,wait_input=True):	
+def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp_seg",
+                                  save_dir="./weights/yoloe26_weight/yoloe26_vp_seg_resave",
+                                  suffix="",
+                                  do_test=True,wait_input=True):	
     """
     Transfer a model trained with old branch to the new branch by resaving the model weight with the new code. This is to verify the compatibility of the model weight between the old and new code, and to test the performance of the resaved model. The function will resave both the detection model and the segmentation model, and test them if do_test is True. It will wait for user input before processing the next model if wait_input is True.
     Args:
         model_dir: str, the directory of the model weights
+        save_dir: str, the directory to save the resaved model weights. If None, it will overwrite the original model weights.
+        suffix: str, the suffix to add to the resaved model weights. If save_dir is None, suffix must be None.
         do_test: bool, whether to test the resaved model
+        
         wait_input: bool, whether to wait for user input before processing the next model
     Returns:
         None
     """
+
+    if save_dir is None:
+        save_dir=model_dir
+        assert suffix is None, "suffix must be None when save_dir is None"
+    os.makedirs(save_dir, exist_ok=True)
+
 
     scales=["26n","26s","26m","26l","26x"]
 
@@ -808,7 +820,7 @@ def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp
         # resave det model
         strip_optimizer(model_weight)        
         model_yaml=f"yoloe-{scale}.yaml"
-        resave_weight=os.path.join(model_dir,f"yoloe-{scale}-resave.pt")
+        resave_weight=os.path.join(save_dir,f"yoloe-{scale}{suffix}.pt")
         YOLOE(model_yaml).load(model_weight).save(resave_weight)
         print(f"Resaved {model_weight} to {resave_weight}")
 
@@ -822,7 +834,7 @@ def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp
 
         # resave seg model
         seg_model_yaml=f"yoloe-{scale}-seg.yaml"
-        resave_seg_weight=os.path.join(model_dir,f"yoloe-{scale}-seg-resave.pt")
+        resave_seg_weight=os.path.join(save_dir,f"yoloe-{scale}-seg{suffix}.pt")
         YOLOE(seg_model_yaml).load(model_weight).save(resave_seg_weight)
         print(f"Resaved {model_weight} to {resave_seg_weight}")
 

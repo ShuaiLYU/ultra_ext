@@ -171,3 +171,21 @@ def concatenate_images_by_prefix(root, prefix, axis=1, set_title=True, font_scal
 
 # Example usage:
 # result = concatenate_images_by_prefix('/path/to/root', 'my_prefix', max_img_per_line=3, padding=10)
+
+
+
+
+def concat_images_sameh(im_files, output_path):
+    images = [cv2.imread(im_file) for im_file in im_files]
+    if any(img is None for img in images):
+        raise ValueError("One or more images could not be read. Please check the file paths.")
+    
+    # Resize images to the same height
+    min_height = min(img.shape[0] for img in images)
+    resized_images = [cv2.resize(img, (int(img.shape[1] * min_height / img.shape[0]), min_height)) for img in images]
+    
+    # Concatenate images horizontally
+    concatenated_image = cv2.hconcat(resized_images)
+    
+    # Save the concatenated image
+    cv2.imwrite(output_path, concatenated_image)

@@ -84,6 +84,32 @@ class UltraCache():
         index=self.im_file_to_index[im_file]
         return self.labels[index]
 
+    def get_all_texts(self, unique=False) -> list:
+        """Return all text strings across all labels.
+
+        Each label's 'texts' is a list of single-item lists, e.g. [["dog"], ["cat"]].
+
+        Args:
+            unique: If True, return deduplicated list (order-preserving).
+
+        Returns:
+            list of str, e.g. ["umbrella", "bracelet", "dog", ...]
+        """
+        texts = []
+        seen = set()
+        for label in self.labels:
+            for t in label.get("texts", []):
+                name = t[0] if (t and len(t) > 0) else None
+                if name is None:
+                    continue
+                if unique:
+                    if name not in seen:
+                        seen.add(name)
+                        texts.append(name)
+                else:
+                    texts.append(name)
+        return texts
+
     
     def to_ultra_result(self, index, save_path=None):
         """Convert a cached label at the given index to an ultralytics Results object.
@@ -162,3 +188,16 @@ class UltraCache():
 
         return result
     
+
+
+if __name__ == "__main__":
+    cache_file="../datasets/mixed_grounding/annotations/final_mixed_train_no_coco_segm.cache"
+    
+    texts= UltraCache(cache_file).get_all_texts(unique=True)
+
+    import os
+    os.makedirs("../buffer/temp", exist_ok=True)
+    # save to ../buffer/temp/mixed_texts.txt
+    with open("../buffer/temp/mixed_texts.txt", "w") as f:
+        for t in texts:
+            f.write(t + "\n")

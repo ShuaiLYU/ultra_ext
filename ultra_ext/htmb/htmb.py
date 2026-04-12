@@ -324,7 +324,7 @@ class TextSpace:
     # Init
     # ══════════════════════════════════════════════════════════
 
-    def __init__(self, tag_list_path: str, log: bool = True):
+    def __init__(self, tag_list_path: str=os.path.join(current_dir, "tag_list.txt"), log: bool = True):
         self.log = log
         self._tag_list_path = tag_list_path
 

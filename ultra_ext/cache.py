@@ -57,8 +57,23 @@ Label 1['segments'] [0]: shape=(20, 2), dtype=float32
 
 class UltraCache():
     def __init__(self, cache_file):
-        self.cache_file=cache_file
-        self.labels=load_labels_from_cache(cache_file)
+        self.cache_file = cache_file
+        from ultralytics.data.utils import load_dataset_cache_file
+        self._cache = load_dataset_cache_file(cache_file)   # keep full dict
+        self.labels = self._cache['labels']
+
+    def save(self, save_path=None):
+        """Save the (modified) cache back to disk.
+
+        Args:
+            save_path: Destination path. Defaults to the original cache file.
+        """
+        import numpy as np
+        save_path = save_path or self.cache_file
+        self._cache['labels'] = self.labels          # sync in-memory labels
+        with open(str(save_path), "wb") as f:
+            np.save(f, self._cache)
+        print(f"[UltraCache] Saved {len(self.labels)} labels → {save_path}")
 
 
 

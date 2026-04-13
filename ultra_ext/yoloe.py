@@ -844,3 +844,61 @@ def test_resave_yoloe_models_main(model_dir="./weights/yoloe26_weight/yoloe26_vp
         # wait user input before processing next model
         if wait_input:
             input(f"Press Enter to continue to the next model...")
+
+
+
+
+def debug_training_yoloe26n_coco128():
+	from ultralytics import YOLOE
+	from ultralytics.models.yolo.yoloe import YOLOETrainerFromScratch
+
+	# Option 1: Use Python dictionary
+
+	data = dict(
+		train=dict(yolo_data=["coco128.yaml"]),
+		val=dict(yolo_data=["coco128.yaml"]),
+	)
+
+	model = YOLOE("yoloe-26.yaml")
+	model.train(
+		data=data,  # or data="yoloe_data.yaml" if using YAML file
+		batch=4,
+		epochs=2,
+		close_mosaic=1,
+		optimizer="AdamW",
+		lr0=2e-3,
+		warmup_bias_lr=0.0,
+		weight_decay=0.025,
+		momentum=0.9,
+		workers=4,
+		trainer=YOLOETrainerFromScratch,
+		# device="0,1,2,3,4,5,6,7",
+	)
+
+
+def debug_training_yoloe26n_coco128_seg():
+	from ultralytics import YOLOE
+	from ultralytics.models.yolo.yoloe import YOLOESegTrainerFromScratch
+
+	# Option 1: Use Python dictionary
+
+	data = dict(
+		train=dict(yolo_data=["coco128-seg.yaml"]),
+		val=dict(yolo_data=["coco128-seg.yaml"]),
+	)
+
+	model = YOLOE("yoloe-26-seg.yaml")
+	model.train(
+		data=data,  # or data="yoloe_data.yaml" if using YAML file
+		batch=4,
+		epochs=2,
+		close_mosaic=1,
+		optimizer="AdamW",
+		lr0=2e-3,
+		warmup_bias_lr=0.0,
+		weight_decay=0.025,
+		momentum=0.9,
+		workers=4,
+		trainer=YOLOESegTrainerFromScratch,
+		# device="0,1,2,3,4,5,6,7",
+	)

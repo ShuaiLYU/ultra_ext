@@ -909,3 +909,75 @@ def debug_training_yoloe26n_coco128_seg():
 		trainer=YOLOESegTrainerFromScratch,
 		# device="0,1,2,3,4,5,6,7",
 	)
+      
+
+class PEModelManager:
+	"""Utility for inspecting and removing the 'pe' attribute from YOLO/YOLOE models."""
+
+	DEFAULT_SIZES = "nsmlx"
+	DEFAULT_SAVE_DIR = "./weights/yoloe26_weight/yoloe26_seg_pf(removed_pe_resave)"
+
+	@staticmethod
+	def check(model):
+		"""Print which layer owns 'pe' and its type."""
+		print("*" * 30)
+		print(type(model))
+		print(type(model.model))
+		print(type(model.model.model))
+		for label, owner in (
+			("model", model),
+			("model.model", model.model),
+			("model.model.model", model.model.model),
+		):
+			if hasattr(owner, "pe"):
+				print(f"{label} has 'pe' attribute.")
+				print(type(owner.pe))
+				return
+		print("No 'pe' attribute found in model, model.model, or model.model.model.")
+
+	@staticmethod
+	def delete(model):
+		"""Delete 'pe' from the module that actually owns it."""
+		for owner_name, owner in (
+			("model", model),
+			("model.model", model.model),
+			("model.model.model", model.model.model),
+		):
+			if hasattr(owner, "_buffers") and "pe" in owner._buffers:
+				del owner._buffers["pe"]
+				print(f"Deleted 'pe' from {owner_name}._buffers")
+				return
+			if hasattr(owner, "_parameters") and "pe" in owner._parameters:
+				del owner._parameters["pe"]
+				print(f"Deleted 'pe' from {owner_name}._parameters")
+				return
+			if "pe" in getattr(owner, "__dict__", {}):
+				delattr(owner, "pe")
+				print(f"Deleted 'pe' from {owner_name}")
+				return
+		raise AttributeError("Could not find owned 'pe' attribute to delete.")
+
+	@classmethod
+	def remove_and_save(cls, sizes=None, save_dir=None):
+		"""Load each pf model, remove 'pe', save, and verify."""
+		import os
+		sizes = sizes or cls.DEFAULT_SIZES
+		save_dir = save_dir or cls.DEFAULT_SAVE_DIR
+		os.makedirs(save_dir, exist_ok=True)
+
+		for s in sizes:
+			weight = f"yoloe-26{s}-seg-pf.pt"
+			print(f"\n--- Processing {weight} ---")
+			model = YOLO(weight)
+			cls.check(model)
+			cls.delete(model)
+
+			save_path = os.path.join(save_dir, f"yoloe-26{s}-seg-pf.pt")
+			model.save(save_path)
+			print(f"Saved model without 'pe' to {save_path}")
+
+			resave = YOLO(save_path)
+			cls.check(resave)
+
+
+# PEModelManager.remove_and_save(sizes="nsmlx")

@@ -147,6 +147,7 @@ from ultralytics import YOLO,YOLOE
 
 
 
+
 def val_yoloe26_tp(model_weight,model_yaml=None,**kwargs):
     """
     validate yoloe26 with text prompt or visual prompt.
@@ -185,6 +186,9 @@ def val_yoloe26_tp(model_weight,model_yaml=None,**kwargs):
     model.val(**kwargs)
     return model
 
+
+# def val_yoloe26_tp_coco128():
+#     val_yoloe26_tp("./weights/yoloe26_weight/yoloe26_vp_seg_resave/yoloe-26n.pt",data="coco128.yaml",device="cpu",split="val",conf=0.1)
 
 # val_yoloe26_tp("yoloe-26l-seg.pt",device="cuda:7")
 """
@@ -856,23 +860,26 @@ def debug_training_yoloe26n_coco128():
 
 	data = dict(
 		train=dict(yolo_data=["coco128.yaml"]),
-		val=dict(yolo_data=["coco128.yaml"]),
+		# val=dict(yolo_data=["../datasets/lvis.yaml"]),
+		val=dict(yolo_data=["lvis.yaml"]),
 	)
 
-	model = YOLOE("yoloe-26.yaml")
+	model = YOLOE("yoloe-26n.yaml").load("yoloe-26n-seg.pt")
 	model.train(
 		data=data,  # or data="yoloe_data.yaml" if using YAML file
-		batch=4,
-		epochs=2,
+		batch=32,
+		epochs=1,
 		close_mosaic=1,
-		optimizer="AdamW",
-		lr0=2e-3,
+		optimizer="SGD",
+		lr0=2e-10,
 		warmup_bias_lr=0.0,
 		weight_decay=0.025,
 		momentum=0.9,
 		workers=4,
 		trainer=YOLOETrainerFromScratch,
 		# device="0,1,2,3,4,5,6,7",
+		device="0",
+		save_json=True, # save_json must be ture for lvis style evaluation
 	)
 
 

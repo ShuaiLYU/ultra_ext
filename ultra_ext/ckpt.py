@@ -116,6 +116,69 @@ def compare_model_and_ema(ckpt_path):
         print(f"  All {identical} floating-point layers are numerically identical between Model and EMA.")
 
 
+
+import os
+from pathlib import Path
+
+def print_model_size(model_weight: str | Path) -> None:
+    """
+    Prints the disk size of a model weight file in human-readable format (MB/GB).
+    
+    Args:
+        model_weight: Path to the model weight file (e.g., "yoloe.pt" or Path object)
+        
+    Behavior:
+        - Automatically converts bytes to MB or GB for readability
+        - Shows warning if the file does not exist
+        - Displays file size with 2 decimal places precision
+    """
+    path = Path(model_weight)
+    
+    if not path.exists():
+        print(f"⚠️ File not found: {path}")
+        return
+    
+    size_bytes = os.path.getsize(path)
+    size_mb = size_bytes / (1024 ** 2)
+    size_gb = size_bytes / (1024 ** 3)
+    
+    filename= path.name
+    if size_gb >= 1.0:
+        print(f"📦 {filename} size: {size_gb:.2f} GB ({size_mb:.2f} MB)")
+    else:
+        print(f"📦 {filename} size: {size_mb:.2f} MB")
+
+
+def list_pt_size(folder: str) -> None:
+    """
+    Lists all .pt files in a given folder along with their sizes in human-readable format.
+    
+    Args:
+        folder: Path to the folder containing .pt files
+        
+    Behavior:
+        - Scans the specified folder for .pt files
+        - Prints each file name and its size in MB/GB
+        - Shows a message if no .pt files are found
+    """
+    path = Path(folder)
+    
+    if not path.is_dir():
+        print(f"⚠️ Not a valid directory: {path}")
+        return
+    
+    pt_files = list(path.glob("*.pt"))
+    
+    if not pt_files:
+        print(f"📂 No .pt files found in {path}")
+        return
+    
+    print(f"📂 Found {len(pt_files)} .pt files in {path}:\n")
+    for pt_file in pt_files:
+        print_model_size(pt_file)
+
+
+
 if __name__ == "__main__":
 
     scale="26n"

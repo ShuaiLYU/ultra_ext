@@ -187,3 +187,6 @@ if __name__ == "__main__":
 
     sprint_ckpt(model_weight,wo_model=True)
     # compare_model_and_ema(model_weight)
+
+    # list_pt_size( "./weights/yoloe26_weight/yoloe26_vp_seg_resave")
+    # list_pt_size( "./weights/yoloe26_weight/yoloe26_seg_pf(removed_pe_resave)")

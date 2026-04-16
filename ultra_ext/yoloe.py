@@ -394,6 +394,33 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		raise
 
 
+def predict_yoloe_pf(model_weight="yoloe-26l-seg-pf.pt", **kwargs):
+
+	try:
+		kwargs["source"] = kwargs.get("source", "ultralytics/assets/bus.jpg")
+		
+		model_yaml=kwargs.pop("model_yaml",None)
+		if model_yaml:
+			model=YOLOE(model_yaml).load(model_weight)
+		else:
+			model = YOLO(model_weight)
+
+		save_path = kwargs.pop("save_path", f"./runs/temp/tp_{os.path.basename(model_weight).replace('.pt', '')}_pred.png")
+		os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+
+		print(f"kwargs: {kwargs}")
+		res = model.predict(**kwargs)[0]
+
+
+		res.save(save_path)
+
+		return save_path
+	except Exception as e:
+		print(f"❌ Error in predict_yoloe_tp: {e}")
+		raise
+
+
 import torch
 from ultralytics import YOLOE,YOLO
 import os

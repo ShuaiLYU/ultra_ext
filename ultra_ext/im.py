@@ -189,3 +189,84 @@ def concat_images_sameh(im_files, output_path):
     
     # Save the concatenated image
     cv2.imwrite(output_path, concatenated_image)
+
+
+def vertical_concat_images(img_paths, save_path="./runs/temp/concat.png", layout="grid", grid_cols=2, texts=None):
+	from PIL import Image, ImageDraw, ImageFont
+
+	# Keep input order. If a path is None or invalid, use a gray placeholder image.
+	valid_images = [Image.open(p).convert("RGB") for p in img_paths if p and os.path.exists(p)]
+	if valid_images:
+		width = max(img.width for img in valid_images)
+		default_height = max(1, int(sum(img.height for img in valid_images) / len(valid_images)))
+	else:
+		width, default_height = 640, 480
+
+	resized_images = []
+	for p in img_paths:
+		if p and os.path.exists(p):
+			img = Image.open(p).convert("RGB")
+			resized_images.append(img.resize((width, int(img.height * width / img.width))))
+		else:
+			resized_images.append(Image.new("RGB", (width, default_height), (0, 0, 0)))
+
+	# Build title strips (gray bars) above each image
+	title_h = int(width*0.075)
+	if texts is None:
+		texts = []
+
+	# Try to load a system font scaled to title_h, fallback to default
+	font_size = max(10, int(title_h * 0.65))
+	font = None
+	try:
+		# macOS font paths
+		for font_path in ["/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc", 
+							"/Library/Fonts/Helvetica.ttf", "/System/Library/Fonts/Arial.ttf"]:
+			if os.path.exists(font_path):
+				font = ImageFont.truetype(font_path, font_size)
+				break
+	except:
+		pass
+	if font is None:
+		font = ImageFont.load_default()
+
+	tiles = []
+	for i, img in enumerate(resized_images):
+		title = str(texts[i]) if i < len(texts) and texts[i] is not None else ""
+		title_bar = Image.new("RGB", (width, title_h), (160, 160, 160))
+		draw = ImageDraw.Draw(title_bar)
+		# Vertically center text in title bar
+		bbox = draw.textbbox((0, 0), title, font=font)
+		text_h = bbox[3] - bbox[1]
+		y = max(0, (title_h - text_h) // 2)
+		draw.text((10, y), title, fill=(20, 20, 20), font=font)
+
+		tile = Image.new("RGB", (width, title_h + img.height), (0, 0, 0))
+		tile.paste(title_bar, (0, 0))
+		tile.paste(img, (0, title_h))
+		tiles.append(tile)
+
+	if layout == "grid":
+		grid_cols = max(1, int(grid_cols))
+		n = len(tiles)
+		rows = (n + grid_cols - 1) // grid_cols
+
+		# Use unified cell height for a cleaner grid
+		cell_h = max(img.height for img in tiles)
+		new_img = Image.new("RGB", (width * grid_cols, cell_h * rows), (0, 0, 0))
+
+		for i, img in enumerate(tiles):
+			r, c = divmod(i, grid_cols)
+			# Top align each tile in its cell
+			new_img.paste(img, (c * width, r * cell_h))
+	else:
+		# Default vertical concat behavior
+		total_height = sum(img.height for img in tiles)
+		new_img = Image.new("RGB", (width, total_height))
+
+		y_offset = 0
+		for img in tiles:
+			new_img.paste(img, (0, y_offset))
+			y_offset += img.height
+
+	new_img.save(save_path)

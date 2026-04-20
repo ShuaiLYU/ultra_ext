@@ -457,11 +457,19 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 		if clip_weight_name:
 			model.args["clip_weight_name"] = clip_weight_name
 
-		from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
-
+		kwargs["task"] = kwargs.get("task", "segment")
+		if kwargs["task"] == "segment":
+			from ultralytics.models.yolo.yoloe import YOLOEVPSegPredictor
+			kwargs["predictor"] = kwargs.get("predictor", YOLOEVPSegPredictor)
+		elif kwargs["task"] == "detect":
+			from ultralytics.models.yolo.yoloe import YOLOEVPDetectPredictor
+			kwargs["predictor"] = kwargs.get("predictor", YOLOEVPDetectPredictor)
+		else:
+			raise ValueError(f"Unsupported task: {kwargs['task']}")
+		
 		kwargs["source"] = kwargs.get("source", TestSample.get_visual_prompt(0)["image"])
 		kwargs["visual_prompts"] = kwargs.get("visual_prompts", TestSample.get_visual_prompt(0)["prompts"])
-		kwargs["predictor"] = kwargs.get("predictor", YOLOEVPSegPredictor)
+
 
 		save_path = kwargs.pop("save_path", f"./runs/temp/vp_{os.path.basename(model_weight).replace('.pt', '')}_pred.png")
 		os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -472,7 +480,6 @@ def predict_yoloe_vp(model_weight="yoloe-26l-seg.pt", **kwargs):
 	except Exception as e:
 		print(f"❌ Error in predict_yoloe_vp: {e}")
 		raise
-
 
 def predict_yoloe_pf(model_weight="yoloe-26l-seg-pf.pt", **kwargs):
 

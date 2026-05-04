@@ -270,3 +270,16 @@ def vertical_concat_images(img_paths, save_path="./runs/temp/concat.png", layout
 			y_offset += img.height
 
 	new_img.save(save_path)
+
+
+def collect_images(directory, exts=(".png", ".jpg", ".jpeg",".bmp"), max_n=None, recursively=True):
+	"""Collect image paths from a directory (recursive), sorted, optionally capped."""
+	if recursively:
+		imgs = sorted(
+			str(p) for p in Path(directory).rglob("*") if p.suffix.lower() in exts
+		)
+	else:
+		imgs = sorted(
+			str(p) for p in Path(directory).glob("*") if p.suffix.lower() in exts
+		)
+	return imgs[:max_n] if max_n else imgs

@@ -12,3 +12,4 @@ from ultra_ext.im import concat_images_sameh
 from ultra_ext.utils import *
 from ultra_ext.cache import UltraCache, print_first_n_labels_from_cache
 from ultra_ext.ckpt import sprint_ckpt, compare_model_and_ema
+from ultra_ext.viz import ImageInspector

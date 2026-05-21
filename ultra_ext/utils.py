@@ -287,6 +287,7 @@ def collect_images(
     exts: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".bmp"),
     max_n: int | None = None,
     recursively: bool = True,
+    ramdom_one=False,
 ) -> list[str]:
     """Return sorted image paths under *directory*, optionally capped at *max_n*.
 
@@ -301,4 +302,8 @@ def collect_images(
     """
     glob = Path(directory).rglob if recursively else Path(directory).glob
     imgs = sorted(str(p) for p in glob("*") if p.suffix.lower() in exts)
+    if ramdom_one and imgs:
+        import random
+        # Use system RNG so callers that set random.seed(...) do not force a fixed pick.
+        return [random.SystemRandom().choice(imgs)]
     return imgs[:max_n] if max_n else imgs

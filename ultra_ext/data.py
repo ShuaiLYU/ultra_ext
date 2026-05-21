@@ -461,3 +461,94 @@ class DagmFolder:
             )
 
         return yaml_paths
+
+    def to_mvtec_ad_per_class(
+        self,
+        out_dir: str | os.PathLike,
+        train_ratio: float = 0.9,
+        seed: int = 42,
+        link_mode: str = "copy",
+        defect_name: str = "defect",
+    ) -> list[Path]:
+        """Convert each ``ClassN`` into MVTec-AD format (one folder per class).
+
+        Layout per class::
+
+            <out_dir>/ClassN/
+                train/good/<img>
+                test/good/<img>
+                test/<defect_name>/<img>
+                ground_truth/<defect_name>/<stem>_mask.png
+
+        The ``train_ratio`` only splits NORMAL images (90% → ``train/good``,
+        10% → ``test/good``). All defect images go to ``test/<defect_name>``,
+        and their masks are copied into ``ground_truth/<defect_name>``.
+
+        Returns:
+            List of per-class output directories.
+        """
+        out_root = Path(out_dir).resolve()
+        out_root.mkdir(parents=True, exist_ok=True)
+        cls_dirs: list[Path] = []
+        stats: list[dict] = []
+
+        for c in self.class_dirs:
+            cls_name = c.name
+            sub_out = out_root / cls_name
+            (sub_out / "train" / "good").mkdir(parents=True, exist_ok=True)
+            (sub_out / "test" / "good").mkdir(parents=True, exist_ok=True)
+            (sub_out / "test" / defect_name).mkdir(parents=True, exist_ok=True)
+            (sub_out / "ground_truth" / defect_name).mkdir(parents=True, exist_ok=True)
+
+            normals: list[Path] = []
+            defects: list[Path] = []
+            for sp in ("Train", "Test"):
+                for img in self._list_images(c / sp):
+                    if self._mask_path(img).exists():
+                        defects.append(img)
+                    else:
+                        normals.append(img)
+
+            rng = random.Random(seed)
+            rng.shuffle(normals)
+            n_train = int(round(len(normals) * train_ratio))
+            train_good = normals[:n_train]
+            test_good = normals[n_train:]
+
+            def _place(img: Path, dst_dir: Path) -> Path:
+                stem = f"{img.parent.name}_{img.stem}"
+                dst = dst_dir / f"{stem}{img.suffix}"
+                _place_image(img, dst, link_mode)
+                return dst
+
+            for img in train_good:
+                _place(img, sub_out / "train" / "good")
+            for img in test_good:
+                _place(img, sub_out / "test" / "good")
+            for img in defects:
+                dst_img = _place(img, sub_out / "test" / defect_name)
+                mask_src = self._mask_path(img)
+                mask_dst = sub_out / "ground_truth" / defect_name / f"{dst_img.stem}_mask{mask_src.suffix}"
+                _place_image(mask_src, mask_dst, link_mode)
+
+            n_train_total = len(train_good)
+            n_val_total = len(test_good) + len(defects)
+            stats.append({
+                "class": cls_name,
+                "train_good": len(train_good),
+                "test_good": len(test_good),
+                "test_defect": len(defects),
+                "train_total": n_train_total,
+                "val_total": n_val_total,
+                "val_ratio_normals": len(test_good) / max(1, len(normals)),
+            })
+            cls_dirs.append(sub_out)
+            print(
+                f"[DagmFolder/MVTecAD/{cls_name}] -> {sub_out} "
+                f"| train/good={len(train_good)} "
+                f"| test/good={len(test_good)} "
+                f"| test/{defect_name}={len(defects)} "
+                f"| val_ratio_on_normals={stats[-1]['val_ratio_normals']:.3f}"
+            )
+
+        return cls_dirs

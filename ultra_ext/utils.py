@@ -279,3 +279,26 @@ def super_print(name, value):
         print(f"{name}: {value} ({type(value).__name__})")
     else:
         print(f"{name}: {value} (type: {type(value).__name__})")
+
+
+
+def collect_images(
+    directory: str | Path,
+    exts: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".bmp"),
+    max_n: int | None = None,
+    recursively: bool = True,
+) -> list[str]:
+    """Return sorted image paths under *directory*, optionally capped at *max_n*.
+
+    Args:
+        directory: Root directory to search.
+        exts: Allowed file extensions (lower-case).
+        max_n: If set, return at most this many paths.
+        recursively: Search sub-directories when True, top-level only otherwise.
+
+    Returns:
+        Sorted list of absolute path strings.
+    """
+    glob = Path(directory).rglob if recursively else Path(directory).glob
+    imgs = sorted(str(p) for p in glob("*") if p.suffix.lower() in exts)
+    return imgs[:max_n] if max_n else imgs

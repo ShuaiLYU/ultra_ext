@@ -1,4 +1,4 @@
-"""Demo: convert the DAGM dataset (Class1..Class10) into YOLO format."""
+"""Demo: convert the DAGM dataset (Class1..Class10) into YOLO segmentation format."""
 
 import shutil
 from pathlib import Path
@@ -16,6 +16,7 @@ def main():
 
     yaml_paths = folder.to_yolo_per_class(
         out_dir=dst,
+        task="segment",  # polygon labels traced from the masks
         train_ratio=0.9,
         seed=42,
         link_mode="copy",
@@ -31,10 +32,6 @@ def main():
         archive = shutil.make_archive(str(zip_base), "zip", root_dir=dst, base_dir=cls_dir.name)
         size_mb = Path(archive).stat().st_size / (1024 * 1024)
         print(f"  {Path(archive).name}  ({size_mb:.1f} MB)")
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":

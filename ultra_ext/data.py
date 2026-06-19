@@ -257,6 +257,53 @@ class DagmFolder:
             boxes.append((int(x), int(y), int(x + w), int(y + h)))
         return boxes
 
+    @staticmethod
+    def _mask_to_polygons(mask_path: Path, min_area: int = 10) -> list[np.ndarray]:
+        """Extract external contour polygons (each an ``Nx2`` int array) from a mask."""
+        m = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        if m is None:
+            return []
+        _, binmask = cv2.threshold(m, 127, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(binmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        polys = []
+        for cnt in contours:
+            if cv2.contourArea(cnt) < min_area:
+                continue
+            pts = cnt.reshape(-1, 2)
+            if len(pts) < 3:
+                continue
+            polys.append(pts)
+        return polys
+
+    def _label_lines(
+        self, img_path: Path, mask_path: Path, cls_id: int, task: str, min_area: int
+    ) -> list[str] | None:
+        """Build YOLO label lines for one defect image.
+
+        ``task="detect"`` emits ``cls cx cy w h`` per connected component;
+        ``task="segment"`` emits ``cls x1 y1 ... xn yn`` polygons per contour.
+        Returns None if the image cannot be read.
+        """
+        im = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+        if im is None:
+            return None
+        h, w = im.shape[:2]
+        lines: list[str] = []
+        if task == "detect":
+            for x1, y1, x2, y2 in self._mask_to_bboxes(mask_path, min_area=min_area):
+                cx = (x1 + x2) / 2.0 / w
+                cy = (y1 + y2) / 2.0 / h
+                nw = (x2 - x1) / w
+                nh = (y2 - y1) / h
+                lines.append(f"{cls_id} {cx:.6f} {cy:.6f} {nw:.6f} {nh:.6f}")
+        elif task == "segment":
+            for poly in self._mask_to_polygons(mask_path, min_area=min_area):
+                coords = " ".join(f"{px / w:.6f} {py / h:.6f}" for px, py in poly)
+                lines.append(f"{cls_id} {coords}")
+        else:
+            raise ValueError(f"Unknown task: {task!r} (use 'detect' or 'segment')")
+        return lines
+
     def to_yolo(
         self,
         out_dir: str | os.PathLike,
@@ -266,8 +313,9 @@ class DagmFolder:
         link_mode: str = "copy",
         include_normal: bool = True,
         min_area: int = 10,
+        task: str = "detect",
     ) -> Path:
-        """Convert DAGM into a YOLO-format detection dataset.
+        """Convert DAGM into a YOLO-format dataset (detect or segment).
 
         Args:
             out_dir: Output dataset root.
@@ -279,6 +327,8 @@ class DagmFolder:
             link_mode: ``"copy"`` (default), ``"symlink"``, or ``"hardlink"``.
             include_normal: Keep images without a mask as background.
             min_area: Skip mask connected components smaller than this.
+            task: ``"detect"`` writes bbox labels; ``"segment"`` writes
+                normalized polygon labels traced from the masks.
 
         Returns:
             Path to the written ``data.yaml``.
@@ -325,21 +375,14 @@ class DagmFolder:
             _place_image(img_path, dst_img, link_mode)
 
             mask_path = self._mask_path(img_path)
-            lines: list[str] = []
             if mask_path.exists():
-                im = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
-                if im is None:
+                lines = self._label_lines(img_path, mask_path, cls_to_id[cls_name], task, min_area)
+                if lines is None:  # unreadable image
                     dst_lbl.write_text("")
                     continue
-                h, w = im.shape[:2]
-                for x1, y1, x2, y2 in self._mask_to_bboxes(mask_path, min_area=min_area):
-                    cx = (x1 + x2) / 2.0 / w
-                    cy = (y1 + y2) / 2.0 / h
-                    nw = (x2 - x1) / w
-                    nh = (y2 - y1) / h
-                    lines.append(f"{cls_to_id[cls_name]} {cx:.6f} {cy:.6f} {nw:.6f} {nh:.6f}")
-                    n_boxes[sp] += 1
+                n_boxes[sp] += len(lines)
             else:
+                lines = []
                 n_bg[sp] += 1
             dst_lbl.write_text("\n".join(lines))
             n_imgs[sp] += 1
@@ -354,10 +397,11 @@ class DagmFolder:
         with open(yaml_path, "w") as f:
             yaml.safe_dump(data_yaml, f, allow_unicode=True, sort_keys=False)
 
+        unit = "polys" if task == "segment" else "boxes"
         print(
             f"[DagmFolder] {sum(n_imgs.values())} images -> {out}\n"
-            f"  train: {n_imgs['train']} imgs ({n_bg['train']} bg) / {n_boxes['train']} boxes\n"
-            f"  val:   {n_imgs['val']} imgs ({n_bg['val']} bg) / {n_boxes['val']} boxes\n"
+            f"  train: {n_imgs['train']} imgs ({n_bg['train']} bg) / {n_boxes['train']} {unit}\n"
+            f"  val:   {n_imgs['val']} imgs ({n_bg['val']} bg) / {n_boxes['val']} {unit}\n"
             f"  classes ({len(class_names)}): {class_names}\n"
             f"  data.yaml: {yaml_path}"
         )
@@ -371,6 +415,7 @@ class DagmFolder:
         link_mode: str = "copy",
         include_normal: bool = True,
         min_area: int = 10,
+        task: str = "detect",
         class_name: str | None = None,
     ) -> list[Path]:
         """Convert each ``ClassN`` into its own single-class YOLO dataset.
@@ -380,6 +425,8 @@ class DagmFolder:
         each class so train/val ratio is exact per-class.
 
         Args:
+            task: ``"detect"`` writes bbox labels; ``"segment"`` writes
+                normalized polygon labels traced from the masks.
             class_name: Override the class name written to ``data.yaml``
                 (e.g. ``"anomaly"``). When None, uses the source folder name.
 
@@ -422,21 +469,14 @@ class DagmFolder:
                 _place_image(img_path, dst_img, link_mode)
 
                 mask_path = self._mask_path(img_path)
-                lines: list[str] = []
                 if mask_path.exists():
-                    im = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
-                    if im is None:
+                    lines = self._label_lines(img_path, mask_path, 0, task, min_area)
+                    if lines is None:  # unreadable image
                         dst_lbl.write_text("")
                         continue
-                    h, w = im.shape[:2]
-                    for x1, y1, x2, y2 in self._mask_to_bboxes(mask_path, min_area=min_area):
-                        cx = (x1 + x2) / 2.0 / w
-                        cy = (y1 + y2) / 2.0 / h
-                        nw = (x2 - x1) / w
-                        nh = (y2 - y1) / h
-                        lines.append(f"0 {cx:.6f} {cy:.6f} {nw:.6f} {nh:.6f}")
-                        n_boxes[sp] += 1
+                    n_boxes[sp] += len(lines)
                 else:
+                    lines = []
                     n_bg[sp] += 1
                 dst_lbl.write_text("\n".join(lines))
                 n_imgs[sp] += 1
@@ -453,10 +493,11 @@ class DagmFolder:
             yaml_paths.append(yaml_path)
 
             ratio = n_imgs["val"] / max(1, sum(n_imgs.values()))
+            unit = "polys" if task == "segment" else "boxes"
             print(
                 f"[DagmFolder/{cls_name}] {sum(n_imgs.values())} imgs -> {sub_out} "
-                f"| train {n_imgs['train']} ({n_bg['train']} bg)/{n_boxes['train']} boxes "
-                f"| val {n_imgs['val']} ({n_bg['val']} bg)/{n_boxes['val']} boxes "
+                f"| train {n_imgs['train']} ({n_bg['train']} bg)/{n_boxes['train']} {unit} "
+                f"| val {n_imgs['val']} ({n_bg['val']} bg)/{n_boxes['val']} {unit} "
                 f"| val_ratio={ratio:.3f}"
             )
 
